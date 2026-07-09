@@ -21,6 +21,14 @@ PRODUCTS = {
             'e': -1.8,
             'seasonality_amplitude': 0.10,
             'lifecycle_shift': True,
+        },
+        'iphone_14_pro': {
+            'base_price': 999.0,
+            'cost': 600.0,
+            'base_q': 300.0,
+            'e': -2.2,
+            'seasonality_amplitude': 0.12,
+            'lifecycle_shift': True,
         }
     },
     'fmcg': {
@@ -54,6 +62,14 @@ PRODUCTS = {
             'base_q': 800.0,
             'e': -2.2,
             'seasonality_amplitude': 0.18,
+            'lifecycle_shift': False,
+        },
+        'ghevar': {
+            'base_price': 15.0,
+            'cost': 6.0,
+            'base_q': 200.0,
+            'e': -1.5,
+            'seasonality_amplitude': 0.0,
             'lifecycle_shift': False,
         }
     }
@@ -89,8 +105,10 @@ def simulate_product_data(category, product_name, config, scenario):
     cci = []
     google_trends = []
     
-    # Setup initial inventory state
-    current_stock = base_q * 3  # 3 weeks of stock
+    # Setup initial inventory state (4 weeks safety stock coverage + lead order)
+    current_stock = base_q * 4.0
+    transit_order = base_q
+    backlog = 0.0  # Accumulate backlog unfulfilled orders during stockouts
     
     # 2. Iterate week by week
     for t in range(156):
@@ -101,52 +119,98 @@ def simulate_product_data(category, product_name, config, scenario):
         age_months = t * 12 / 52
         
         # A. Product Lifecycle Modifier (L)
-        if config['lifecycle_shift']:
-            if age_months < 6:
-                L = 0.70  # Launch
-            elif age_months < 18:
-                L = 0.85  # Growth
-            elif age_months < 36:
-                L = 1.0   # Mature
+        if product_name == 'iphone_14_pro':
+            # Initial high sale, hype initially and lifecycle reduces
+            if t < 40:
+                L = 0.50  # less sensitive/hype phase
             else:
-                L = 1.2   # Decline
+                L = 1.80  # more sensitive/decline phase
+        elif config['lifecycle_shift']:
+            L = 0.70 + 0.50 / (1.0 + np.exp(-0.25 * (age_months - 18.0)))
         else:
             L = 1.0  # FMCG stays mature
             
         # B. Consumer Sentiment (X) and CCI
-        if scenario == 'inflation':
-            # Consumer sentiment drops over time
+        if product_name == 'ghevar':
+            current_cci = 115.0 + np.random.normal(0, 1.0)
+        elif scenario == 'inflation':
             current_cci = max(80.0, 100.0 - t * 0.12)
-            current_cost = cost * (1.0 + t * 0.001)  # supply cost inflation
         else:
             current_cci = 100.0 + np.random.normal(0, 1.5)
-            current_cost = cost
             
         X = 1.0 + 0.1 * (current_cci - 100.0) / 100.0
         
-        # C. Competitor Price & Gap (C)
-        if scenario == 'competitor_war' and t > 80:
-            # Competitor starts dumping price
-            comp_price = base_price * 0.80 + np.random.normal(0, base_price * 0.02)
-        else:
-            comp_price = base_price + np.random.normal(0, base_price * 0.03)
+        # Helper vars for lagging competitor and cost tracking
+        comp_price_prev = comp_prices[-1] if len(comp_prices) > 0 else base_price
+        own_price_lag2 = prices[-2] if len(prices) >= 2 else base_price
+        
+        # C. & D. Price Decisions, Cost & Competitor pricing (systematic trends & lag feedback loop)
+        if scenario == 'inflation':
+            price_trend = 0.35 * (t / 156.0)  # 35% inflation over 3 years
+            own_price = base_price * (1.0 + price_trend) + np.random.normal(0, base_price * 0.01)
+            comp_price = base_price * (1.0 + price_trend * 0.92) + np.random.normal(0, base_price * 0.01)
+            current_cost = cost * (1.0 + price_trend * 0.8)
+            promo_flag = 0
+            spend = 0.0
+        elif scenario == 'competitor_war':
+            current_cost = cost
+            if t > 80:
+                comp_price = base_price * 0.75 + np.random.normal(0, base_price * 0.015)
+            else:
+                # Competitor pricing reacts to own price decisions with lag
+                comp_price = comp_price_prev - 0.15 * (comp_price_prev - own_price_lag2) + np.random.normal(0, base_price * 0.01)
+                
+            if t > 95:
+                own_price = base_price * 0.80 + np.random.normal(0, base_price * 0.01)
+            elif t > 80:
+                own_price = base_price * 0.98 + np.random.normal(0, base_price * 0.01)
+            else:
+                own_price = base_price + np.random.normal(0, base_price * 0.015)
+            promo_flag = 0
+            spend = 0.0
+        elif scenario == 'promo_heavy':
+            current_cost = cost
+            # Competitor pricing follows with lag
+            comp_price = comp_price_prev - 0.15 * (comp_price_prev - own_price_lag2) + np.random.normal(0, base_price * 0.01)
+            if t % 4 == 0:
+                own_price = base_price * 0.80
+                promo_flag = 1
+                spend = base_price * 2.5
+            else:
+                own_price = base_price * 1.05 + np.random.normal(0, base_price * 0.01)
+                promo_flag = 0
+                spend = 0.0
+        else: # stable
+            current_cost = cost
+            # Systematic annual pricing cycle (15% systematic price increase then drop, using 39-week cycle to avoid seasonality collinearity)
+            price_cycle = 0.15 * np.sin(2.0 * np.pi * t / 39.0)
+            own_price = base_price * (1.0 + price_cycle) + np.random.normal(0, base_price * 0.01)
+            # Competitor pricing follows with lag
+            comp_price = comp_price_prev - 0.20 * (comp_price_prev - own_price_lag2) + np.random.normal(0, base_price * 0.015)
+            promo_flag = 0
+            spend = 0.0
             
-        # D. Price Decision (Own Price)
-        if scenario == 'promo_heavy' and t % 4 == 0:
-            # Every 4 weeks we run a promo price cut
-            own_price = base_price * 0.82
-            promo_flag = 1
-            spend = base_price * 2.5
-        elif scenario == 'competitor_war' and t > 95:
-            # Match competitor price war halfway
-            own_price = base_price * 0.90 + np.random.normal(0, base_price * 0.01)
-            promo_flag = 0
-            spend = 0.0
-        else:
-            # Normal pricing fluctuations
-            own_price = base_price + np.random.normal(0, base_price * 0.02)
-            promo_flag = 0
-            spend = 0.0
+        # Custom product overrides for Cost, Competitor pricing, and Promotions
+        if product_name == 'iphone_14_pro':
+            # Cost for production increased drastically in 2025 (week 78+)
+            if t >= 78:
+                current_cost = cost * 1.55
+                if scenario == 'inflation':
+                    current_cost *= (1.0 + price_trend * 0.8)
+            else:
+                current_cost = cost
+                if scenario == 'inflation':
+                    current_cost *= (1.0 + price_trend * 0.8)
+        elif product_name == 'ghevar':
+            # cheap, low quality competitors
+            comp_price = own_price * 0.55 + np.random.normal(0, own_price * 0.02)
+            # promotions are moderate: Teej festival weeks (around August / week 31-32)
+            if week_of_year in [31, 32]:
+                promo_flag = 1
+                spend = base_price * 0.4
+            else:
+                promo_flag = 0
+                spend = 0.0
             
         gap = (own_price - comp_price) / comp_price
         C = 1.0 + 0.2 * np.sign(gap) * min(abs(gap), 0.5)
@@ -155,21 +219,30 @@ def simulate_product_data(category, product_name, config, scenario):
         e_eff = base_e * C * L * X
         
         # F. Seasonality (S)
-        S = 1.0 + config['seasonality_amplitude'] * np.sin(2.0 * np.pi * week_of_year / 52.0)
+        if product_name == 'ghevar':
+            # Major sale in July15 - Aug15 (weeks 29 to 33)
+            if 29 <= week_of_year <= 33:
+                S = 4.5 + np.random.normal(0, 0.2)
+            else:
+                S = 0.65 + np.random.normal(0, 0.05)
+        else:
+            S = 1.0 + config['seasonality_amplitude'] * np.sin(2.0 * np.pi * week_of_year / 52.0)
         
         # G. Inventory Coverage (I)
-        # Daily sales proxy
         est_daily_sales = base_q / 7.0
         coverage_days = current_stock / max(0.1, est_daily_sales)
         
-        # Stockouts and Scarcity
         if coverage_days < 7:
             I_val = 1.15
         else:
             I_val = 1.0
             
-        # H. Promo Lift
-        lift_M = 0.25 if promo_flag == 1 else 0.0
+        # H. Promo Lift (log-decay S-curve marketing returns)
+        if promo_flag == 1:
+            lift_M = 0.12 * np.log1p(spend / (base_price * 0.5))
+        else:
+            lift_M = 0.0
+            
         if category == 'electronics':
             lift_M *= 1.5  # Electronics react more to promos
             
@@ -181,26 +254,33 @@ def simulate_product_data(category, product_name, config, scenario):
         Q_actual = Q_proj * noise
         
         # Inject Spikes for testing (S1-S5)
-        # We inject an unexplained transient hype spike (Type A) at Week 45
         if t == 45:
             Q_actual = Q_proj * 2.5  # 250% demand spike
             
-        # We inject a social media hype spike (Type A) at Week 110
         if t == 110:
             Q_actual = Q_proj * 2.2
             
-        # J. Inventory Supply Cap & Update
+        # J. Inventory Supply Cap & Backlog Carry-over
         if current_stock < 3 * est_daily_sales:  # Severe stockout
-            # Exclude week for estimation, clamp units sold
             actual_sold = min(Q_actual, current_stock)
+            backlog += (Q_actual - actual_sold)  # accumulate unfulfilled demand
         else:
             actual_sold = Q_actual
+            if backlog > 0:
+                # Fulfill up to 50% of base demand from backlog as a surge (Type A transient spike)
+                surge = min(backlog, base_q * 0.5)
+                actual_sold += surge
+                backlog -= surge
             
         actual_sold = max(0, int(actual_sold))
         
-        # Replenish stock
-        refill = base_q + np.random.normal(0, base_q * 0.1)
+        # 1-week lead time replenishment model (restore stock to safety levels)
+        refill = transit_order
         current_stock = max(10, current_stock - actual_sold + refill)
+        
+        # Place order for next week to maintain safety stock (4 weeks of base demand)
+        safety_stock = base_q * 4.0
+        transit_order = max(0.0, safety_stock - current_stock + np.random.normal(0, base_q * 0.1))
         
         # Append data points
         prices.append(round(own_price, 2))

@@ -6,15 +6,16 @@ authors = [
     {name = "ATISHAY JAIN",email = "atishayj.dev@gmail.com"}
 ]
 readme = "README.md"
-requires-python = ">=3.9"
+requires-python = ">=3.9, !=3.9.7"
 dependencies = [
-    "streamlit",
+    "streamlit>=1.29.0",
     "pandas",
     "numpy",
     "statsmodels",
     "scikit-learn",
     "plotly",
-    "openpyxl"
+    "openpyxl",
+    "matplotlib"
 ]
 
 

@@ -1,7 +1,7 @@
 import numpy as np
 import pandas as pd
 import statsmodels.api as sm
-from src.agents.base_agent import BaseAgent
+from agents.base_agent import BaseAgent
 
 class ElasticityAgent(BaseAgent):
     def __init__(self):
@@ -18,8 +18,12 @@ class ElasticityAgent(BaseAgent):
                 'details': "Sales data is completely missing. Using category proxy."
             }
 
-        # Filter out rows marked for exclusion (Type A spikes)
-        clean_sales = df_sales[df_sales['exclude_from_regression'] == False]
+        # Filter out rows marked for exclusion (Type A spikes) and zero/negative sales/prices
+        clean_sales = df_sales[
+            (df_sales['exclude_from_regression'] == False) & 
+            (df_sales['units_sold'] > 0) & 
+            (df_sales['unit_price'] > 0)
+        ]
             
         n_obs = len(clean_sales)
         if n_obs < 10:
@@ -32,10 +36,17 @@ class ElasticityAgent(BaseAgent):
             }
 
         try:
+            # Calculate time weights based on age of observation in weeks (52-week half-life)
+            max_date = pd.to_datetime(clean_sales['date']).max()
+            t_diff_weeks = (max_date - pd.to_datetime(clean_sales['date'])).dt.days / 7.0
+            weights = 0.9868 ** t_diff_weeks
+            if 'rebaseline_weight_multiplier' in clean_sales.columns:
+                weights *= clean_sales['rebaseline_weight_multiplier'].fillna(1.0).values
+
             log_q = np.log(clean_sales['units_sold'])
             log_p = np.log(clean_sales['unit_price'])
             X = sm.add_constant(log_p)
-            model = sm.OLS(log_q, X).fit()
+            model = sm.WLS(log_q, X, weights=weights).fit()
             
             e_estimate = model.params.iloc[1] if len(model.params) > 1 else self.default_val
             r2 = model.rsquared
@@ -44,7 +55,7 @@ class ElasticityAgent(BaseAgent):
             ci_width = ci[1] - ci[0]
             
             reliability = self.reliability_score
-            details = f"OLS estimated elasticity: {e_estimate:.3f} (R² = {r2:.4f}, Obs = {n_obs})"
+            details = f"WLS estimated elasticity: {e_estimate:.3f} (R² = {r2:.4f}, Obs = {n_obs})"
             
             status = 'Used'
             if n_obs < 30:
@@ -67,7 +78,7 @@ class ElasticityAgent(BaseAgent):
                 'r2': 0.0,
                 'reliability': 'PROVISIONAL',
                 'status': 'Used (Proxy)',
-                'details': f"OLS regression failed: {str(e)}. Using default proxy."
+                'details': f"WLS regression failed: {str(e)}. Using default proxy."
             }
 
 
@@ -94,12 +105,22 @@ class SeasonalityAgent(BaseAgent):
                 'date': pd.to_datetime(df_sales['date'].values)
             })
             df_res['week'] = df_res['date'].dt.isocalendar().week
+            if 'rebaseline_weight_multiplier' in df_sales.columns:
+                df_res['rebaseline_weight_multiplier'] = df_sales['rebaseline_weight_multiplier'].values
+            else:
+                df_res['rebaseline_weight_multiplier'] = 1.0
             
             week_averages = df_res.groupby('week')['residuals'].mean()
             
+            # Calculate time weights (52-week half-life)
+            max_date = pd.to_datetime(df_res['date']).max()
+            t_diff_weeks = (max_date - pd.to_datetime(df_res['date'])).dt.days / 7.0
+            weights = 0.9868 ** t_diff_weeks
+            weights *= df_res['rebaseline_weight_multiplier'].fillna(1.0).values
+            
             dummies = pd.get_dummies(df_res['week'], drop_first=True, dtype=float)
             X = sm.add_constant(dummies)
-            model = sm.OLS(df_res['residuals'], X).fit()
+            model = sm.WLS(df_res['residuals'], X, weights=weights).fit()
             r2 = model.rsquared
             
             if r2 < 0.05:
@@ -158,8 +179,15 @@ class CompetitorAgent(BaseAgent):
             gap = (own_p - comp_p) / comp_p
             gap_clamped = np.clip(gap, -0.5, 0.5)
             
+            # Calculate time weights (52-week half-life)
+            max_date = pd.to_datetime(df_sales['date']).max()
+            t_diff_weeks = (max_date - pd.to_datetime(df_sales['date'])).dt.days / 7.0
+            weights = 0.9868 ** t_diff_weeks
+            if 'rebaseline_weight_multiplier' in df_sales.columns:
+                weights *= df_sales['rebaseline_weight_multiplier'].fillna(1.0).values
+            
             X = sm.add_constant(gap_clamped)
-            model = sm.OLS(residuals, X).fit()
+            model = sm.WLS(residuals, X, weights=weights).fit()
             r2 = model.rsquared
             
             current_own = own_p[-1]
@@ -207,8 +235,15 @@ class PromoAgent(BaseAgent):
         try:
             promo_flag = df_promo['is_promo'].values
             
+            # Calculate time weights (52-week half-life)
+            max_date = pd.to_datetime(df_sales['date']).max()
+            t_diff_weeks = (max_date - pd.to_datetime(df_sales['date'])).dt.days / 7.0
+            weights = 0.9868 ** t_diff_weeks
+            if 'rebaseline_weight_multiplier' in df_sales.columns:
+                weights *= df_sales['rebaseline_weight_multiplier'].fillna(1.0).values
+            
             X = sm.add_constant(promo_flag)
-            model = sm.OLS(residuals, X).fit()
+            model = sm.WLS(residuals, X, weights=weights).fit()
             r2 = model.rsquared
             
             b_promo = model.params.iloc[1] if len(model.params) > 1 else 0.0
@@ -259,8 +294,15 @@ class InventoryAgent(BaseAgent):
             coverage = stock_level / np.maximum(0.1, daily_sales)
             low_stock_dummy = (coverage < 7).astype(float)
             
+            # Calculate time weights (52-week half-life)
+            max_date = pd.to_datetime(df_sales['date']).max()
+            t_diff_weeks = (max_date - pd.to_datetime(df_sales['date'])).dt.days / 7.0
+            weights = 0.9868 ** t_diff_weeks
+            if 'rebaseline_weight_multiplier' in df_sales.columns:
+                weights *= df_sales['rebaseline_weight_multiplier'].fillna(1.0).values
+            
             X = sm.add_constant(low_stock_dummy)
-            model = sm.OLS(residuals, X).fit()
+            model = sm.WLS(residuals, X, weights=weights).fit()
             r2 = model.rsquared
             
             if r2 < 0.03:
@@ -331,10 +373,17 @@ class LifecycleAgent(BaseAgent):
                 else:
                     phases.append('decline')
                     
+            # Calculate time weights (52-week half-life)
+            max_date = pd.to_datetime(df_sales['date']).max()
+            t_diff_weeks = (max_date - pd.to_datetime(df_sales['date'])).dt.days / 7.0
+            weights = 0.9868 ** t_diff_weeks
+            if 'rebaseline_weight_multiplier' in df_sales.columns:
+                weights *= df_sales['rebaseline_weight_multiplier'].fillna(1.0).values
+            
             df_phases = pd.get_dummies(phases, drop_first=True, dtype=float)
             if df_phases.shape[1] > 0:
                 X = sm.add_constant(df_phases)
-                model = sm.OLS(residuals, X).fit()
+                model = sm.WLS(residuals, X, weights=weights).fit()
                 r2 = model.rsquared
             else:
                 r2 = 0.0
@@ -394,8 +443,15 @@ class SentimentAgent(BaseAgent):
             
             sent_signal = (cci_curr - cci_base) / cci_base
             
+            # Calculate time weights (52-week half-life)
+            max_date = pd.to_datetime(df_sales['date']).max()
+            t_diff_weeks = (max_date - pd.to_datetime(df_sales['date'])).dt.days / 7.0
+            weights = 0.9868 ** t_diff_weeks
+            if 'rebaseline_weight_multiplier' in df_sales.columns:
+                weights *= df_sales['rebaseline_weight_multiplier'].fillna(1.0).values
+            
             X = sm.add_constant(sent_signal)
-            model = sm.OLS(residuals, X).fit()
+            model = sm.WLS(residuals, X, weights=weights).fit()
             r2 = model.rsquared
             
             if r2 < 0.05:

@@ -1,8 +1,8 @@
 import numpy as np
 import pandas as pd
 import concurrent.futures
-from src.utils.spike_detector import SpikeDetector
-from src.agents.factor_agents import (
+from utils.spike_detector import SpikeDetector
+from agents.factor_agents import (
     ElasticityAgent, SeasonalityAgent, CompetitorAgent,
     PromoAgent, InventoryAgent, LifecycleAgent, SentimentAgent
 )
@@ -32,10 +32,12 @@ class CoordinatorAgent:
             df_promo=df_dict.get('promotions')
         )
         
+        df_clean['rebaseline_weight_multiplier'] = 1.0
         last_rebaseline = df_clean['rebaseline_start'].dropna()
         if len(last_rebaseline) > 0:
             rebaseline_idx = int(last_rebaseline.iloc[-1])
-            df_clean = df_clean.iloc[rebaseline_idx:].reset_index(drop=True)
+            # Reduce weight of prior data to 0.2 instead of discarding
+            df_clean.loc[:rebaseline_idx - 1, 'rebaseline_weight_multiplier'] = 0.2
             
         elasticity_result = self.agents['elasticity'].assess({'sales': df_clean})
         e_base = elasticity_result['factor_value']

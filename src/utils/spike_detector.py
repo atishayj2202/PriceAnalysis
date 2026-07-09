@@ -54,22 +54,26 @@ class SpikeDetector:
             if s1_trigger or s2_trigger:
                 is_spike[i] = True
                 
+                # Compute a stable pre-spike baseline using 4-week median to ignore single-week stockouts
+                pre_spike_baseline = df.loc[i-4:i-1, 'units_sold'].median()
+                pre_spike_baseline = max(1.0, pre_spike_baseline)
+                
                 # Check for S5: Demand reverts to pre-spike baseline within 3 weeks
                 reverts = False
                 if i + 3 < n:
                     q_post = df.loc[i+1:i+3, 'units_sold']
-                    # Reverts if any of the next 3 weeks returns near the pre-spike level (<= 1.2 * q_prev)
-                    if (q_post <= self.reversion_threshold * q_prev).any():
+                    # Reverts if any of the next 3 weeks returns near the baseline (<= 1.2 * pre_spike_baseline)
+                    if (q_post <= self.reversion_threshold * pre_spike_baseline).any():
                         reverts = True
                 else:
                     # If we don't have enough future data, default to reverts (Type A) as per PDF
                     reverts = True
                     
-                # Check for Type B: Structural shift (holds for 4+ weeks at >= 1.8 * q_prev)
+                # Check for Type B: Structural shift (holds for 4+ weeks at >= 1.8 * pre_spike_baseline)
                 structural_shift = False
                 if i + 4 < n:
                     q_post_4w = df.loc[i+1:i+4, 'units_sold']
-                    if (q_post_4w >= self.structural_threshold * q_prev).all():
+                    if (q_post_4w >= self.structural_threshold * pre_spike_baseline).all():
                         structural_shift = True
                         
                 if structural_shift:

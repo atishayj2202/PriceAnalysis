@@ -36,10 +36,10 @@ class ElasticityAgent(BaseAgent):
             }
 
         try:
-            # Calculate time weights based on age of observation in weeks (52-week half-life)
+            # Calculate time weights based on age of observation in weeks (24-week EMA equivalent decay)
             max_date = pd.to_datetime(clean_sales['date']).max()
             t_diff_weeks = (max_date - pd.to_datetime(clean_sales['date'])).dt.days / 7.0
-            weights = 0.9868 ** t_diff_weeks
+            weights = 0.9200 ** t_diff_weeks
             if 'rebaseline_weight_multiplier' in clean_sales.columns:
                 weights *= clean_sales['rebaseline_weight_multiplier'].fillna(1.0).values
 
@@ -90,13 +90,13 @@ class SeasonalityAgent(BaseAgent):
         df_sales = data_dict.get('sales')
         residuals = data_dict.get('residuals')
         
-        if df_sales is None or residuals is None or len(df_sales) < 104:
+        if df_sales is None or residuals is None or len(df_sales) < 52:
             return {
                 'factor_value': self.default_val,
                 'r2': 0.0,
                 'reliability': self.reliability_score,
                 'status': 'Left Out',
-                'details': "Fewer than 2 full cycles (104 weeks) available. Seasonality set to 1.0."
+                'details': "Fewer than 1 full cycle (52 weeks) available. Seasonality set to 1.0."
             }
             
         try:
@@ -110,7 +110,9 @@ class SeasonalityAgent(BaseAgent):
             else:
                 df_res['rebaseline_weight_multiplier'] = 1.0
             
-            week_averages = df_res.groupby('week')['residuals'].mean()
+            # Calculate sine and cosine components for annual seasonality
+            df_res['sin_52'] = np.sin(2.0 * np.pi * df_res['week'] / 52.0)
+            df_res['cos_52'] = np.cos(2.0 * np.pi * df_res['week'] / 52.0)
             
             # Calculate time weights (52-week half-life)
             max_date = pd.to_datetime(df_res['date']).max()
@@ -118,8 +120,7 @@ class SeasonalityAgent(BaseAgent):
             weights = 0.9868 ** t_diff_weeks
             weights *= df_res['rebaseline_weight_multiplier'].fillna(1.0).values
             
-            dummies = pd.get_dummies(df_res['week'], drop_first=True, dtype=float)
-            X = sm.add_constant(dummies)
+            X = sm.add_constant(df_res[['sin_52', 'cos_52']])
             model = sm.WLS(df_res['residuals'], X, weights=weights).fit()
             r2 = model.rsquared
             
@@ -132,8 +133,18 @@ class SeasonalityAgent(BaseAgent):
                     'details': f"R² ({r2:.4f}) is below seasonal threshold (0.05). Excluded."
                 }
                 
+            # Predict for all 52 weeks to populate week_averages for plotting
+            b0 = model.params.iloc[0]
+            b_sin = model.params.get('sin_52', 0.0)
+            b_cos = model.params.get('cos_52', 0.0)
+            
+            week_nums = np.arange(1, 53)
+            pred_residuals = b0 + b_sin * np.sin(2.0 * np.pi * week_nums / 52.0) + b_cos * np.cos(2.0 * np.pi * week_nums / 52.0)
+            week_averages = pd.Series(pred_residuals, index=week_nums)
+            
             last_week = df_res['week'].iloc[-1]
-            s_val = np.exp(week_averages.get(last_week, 0.0))
+            pred_last = b0 + b_sin * np.sin(2.0 * np.pi * last_week / 52.0) + b_cos * np.cos(2.0 * np.pi * last_week / 52.0)
+            s_val = np.exp(pred_last)
             s_val = max(0.3, min(3.0, s_val))
             
             return {

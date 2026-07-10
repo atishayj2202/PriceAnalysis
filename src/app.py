@@ -174,7 +174,8 @@ if data_mode == "Load Mock Data Presets":
         
     scenario = st.sidebar.selectbox("Market Condition", ["stable", "inflation", "promo_heavy", "competitor_war"])
     
-    mock_base_path = f"/Users/atishayjain/PycharmProjects/PwC/PriceAnalysis/MockData/{category}/{product}/{scenario}"
+    base_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+    mock_base_path = os.path.join(base_dir, "MockData", category, product, scenario)
     
     if os.path.exists(mock_base_path):
         df_dict['sales'] = pd.read_csv(os.path.join(mock_base_path, 'sales_demand.csv'))
@@ -229,6 +230,20 @@ p_base = analysis_summary['p_base']
 q_base = analysis_summary['q_base']
 cost_base = analysis_summary['cost_base']
 
+# Reset sandbox session state values when product SKU changes to prevent out-of-bounds StreamlitValueAboveMaxError
+cat_val = category if 'category' in locals() else ""
+prod_val = product if 'product' in locals() else ""
+scen_val = scenario if 'scenario' in locals() else ""
+sku_key = f"{cat_val}_{prod_val}_{scen_val}" if data_mode == "Load Mock Data Presets" else "custom_upload"
+
+if 'prev_sku_key' not in st.session_state:
+    st.session_state.prev_sku_key = sku_key
+
+if st.session_state.prev_sku_key != sku_key:
+    st.session_state.prev_sku_key = sku_key
+    st.session_state.sim_change_pct = 0.0
+    st.session_state.sim_price_val = float(round(p_base, 2))
+
 # Pre-calculate Optimal Price points
 x_range = np.linspace(-30.0, 30.0, 100)
 opt_profit_x = 0.0
@@ -248,12 +263,13 @@ for x in x_range:
         opt_rev_x = x
 
 # TABS SEPARATION
-tab_result, tab_curves, tab_trends, tab_debug, tab_audit = st.tabs([
+tab_result, tab_curves, tab_trends, tab_debug, tab_audit, tab_doc = st.tabs([
     "🎯 Results & Simulation", 
     "📈 Demand & Profit Curves", 
     "📊 Historical Trends",
     "🐞 Debug Calculations",
-    "🔍 Spikes & Run Logs"
+    "🔍 Spikes & Run Logs",
+    "📖 Documentation"
 ])
 
 # ==============================================================================
@@ -773,8 +789,8 @@ with tab_trends:
     if len(df_ema_e) > 0:
         ax_el.plot(df_ema_e['date'].values, df_ema_e['ema_elasticity'].values, linewidth=2.5, color='#17a2b8', label="Exponentially Weighted (EMA)")
         
-    # Plot normal/baseline elasticity (horizontal line)
-    ax_el.axhline(y=e_base, color='#f6c23e', linestyle='-', linewidth=2, label=f"Normal Elasticity ({e_base:.2f})")
+    # Plot normal/baseline elasticity (horizontal line, now exponentially weighted in the main agent)
+    ax_el.axhline(y=e_base, color='#f6c23e', linestyle='-', linewidth=2, label=f"EMA Elasticity (Main Agent: {e_base:.2f})")
         
     # Reference bounds (dashed lines)
     ax_el.axhline(y=-0.2, linestyle='--', color='#718096', alpha=0.7, label="Lower Bound (-0.2)")
@@ -1133,7 +1149,6 @@ with tab_audit:
     else:
         st.success("✅ Data cleaning complete: No demand spikes detected in history.")
         
-    st.markdown("#### 📜 Pricing Simulation Run Log (Audit Trail)")
     st.code(f"""
 [RUN LOG - SIMULATION METADATA]
 Product Base Price: {p_base:.2f}
@@ -1148,3 +1163,85 @@ Expected Revenue Delta: {sim_proj['rev_increase']:+,.2f} ({sim_proj['rev_increas
 Expected Profit Delta: {sim_proj['profit_increase']:+,.2f} ({sim_proj['profit_increase_pct']:+.1f}%)
 Status: {"⛔ BLOCKED (Hard Stop Active)" if len(hard_stops) > 0 else "✅ CLEARED FOR EXECUTION"}
 """, language="ini")
+
+# ==============================================================================
+# TAB 6: DOCUMENTATION
+# ==============================================================================
+with tab_doc:
+    st.markdown("### 📖 Demand & Price Elasticity Documentation")
+    st.markdown("Learn how the multi-agent system cleans data, calculates reliability, fits regressions, and applies modifiers.")
+
+    st.markdown("---")
+    st.subheader("🏁 Final Projections Formula")
+    st.markdown("The final combined pricing and demand forecasting formula is stated below:")
+    
+    # Combined Symbolic Formula
+    st.markdown("**Symbolic Formula:**")
+    st.latex(r"Q_{\text{new}} = Q_{\text{base}} \cdot \left( \frac{P_{\text{new}}}{P_{\text{base}}} \right)^{e_{\text{base}} \cdot C \cdot L \cdot X} \cdot S \cdot I \cdot (1 + \text{lift}_M)")
+    
+    # Dynamic live numbers calculation
+    e_base_val = analysis_summary['e_base']
+    C_val = sim_proj['C']
+    L_val = sim_proj['L']
+    X_val = sim_proj['X']
+    S_val = sim_proj['S']
+    I_val = sim_proj['I']
+    lift_m_val = sim_proj['lift_m']
+    q_base_val = analysis_summary['q_base']
+    p_base_val = analysis_summary['p_base']
+    p_new_val = sim_proj['p_new']
+    q_new_val = sim_proj['q_new']
+    
+    st.markdown("**Live Numeric Calculation (Mapped from Sandbox selections):**")
+    st.latex(f"Q_{{\\text{{new}}}} = ({q_base_val:.1f}) \\cdot \\left( \\frac{{{p_new_val:.2f}}}{{{p_base_val:.2f}}} \\right)^{{({e_base_val:.3f}) \\cdot ({C_val:.3f}) \\cdot ({L_val:.3f}) \\cdot ({X_val:.3f})}} \\cdot ({S_val:.3f}) \\cdot ({I_val:.3f}) \\cdot (1 + {lift_m_val:.3f}) = {q_new_val:.1f}")
+
+    st.markdown("#### 📝 Terminology Glossary & Explanations:")
+    st.markdown(r"""
+* **$Q_{\text{new}}$** (""" + f"{q_new_val:.1f}" + r"""): **Projected Demand Quantity**, representing the expected units sold per week.
+* **$Q_{\text{base}}$** (""" + f"{q_base_val:.1f}" + r"""): **Base Weekly Quantity**, the historical baseline quantity of units sold.
+* **$P_{\text{new}}$** ($""" + f"{p_new_val:.2f}" + r"""$) / **$P_{\text{base}}$** ($""" + f"{p_base_val:.2f}" + r"""$): **Simulated Price / Baseline Price** ratio.
+* **$e_{\text{base}}$** (""" + f"{e_base_val:.3f}" + r"""): **Baseline Price Elasticity**, fitted via **Exponentially Weighted Least Squares (WLS)** regression of $\log(Q)$ vs $\log(P)$ with 24-week EMA-equivalent time-decay weights ($0.9200^{\Delta t}$) to prioritize recent market price sensitivity.
+* **$C$** (""" + f"{C_val:.3f}" + r"""): **Competitor Pricing Modifier**, scales the elasticity exponent based on our price gap relative to competitors.
+* **$L$** (""" + f"{L_val:.3f}" + r"""): **Product Lifecycle Modifier**, adjusts price sensitivity depending on launch hype or decline saturation phases.
+* **$X$** (""" + f"{X_val:.3f}" + r"""): **Consumer Sentiment Modifier**, scales elasticity to adjust for macro buyer confidence (CCI index changes).
+* **$S$** (""" + f"{S_val:.3f}" + r"""): **Seasonality Modifier**, multiplies volume to account for yearly calendar cycle fluctuations (like holidays/weather).
+* **$I$** (""" + f"{I_val:.3f}" + r"""): **Inventory Stockout Modifier**, accounts for stock out supply caps or low-stock consumer scarcity signals.
+* **$\text{lift}_M$** (""" + f"{lift_m_val:.3f}" + r"""): **Promotional Volume Lift**, captures the percentage volume increase when marketing promotion campaigns are active.
+""")
+
+    st.markdown("---")
+    st.subheader("📋 Factor Regression & Modifier Formulas")
+    
+    # Table of formulas and symbols
+    st.markdown("""
+| Factor | Formula | Active State Modifier | Symbols Explanation |
+| :--- | :--- | :--- | :--- |
+| **$F_1$ - Price Elasticity** | $\\log(Q_t) = \\beta_0 + e_{\\text{base}} \\log(P_t) + \\epsilon_t$ | Baseline Elasticity ($e_{\\text{base}}$) | **$Q_t$**: units sold, **$P_t$**: unit price, **$e_{\\text{base}}$**: base elasticity coefficient, **$\\epsilon_t$**: residual. |
+| **$F_2$ - Seasonality** | $\\epsilon_t = \\gamma_0 + \\sum \\gamma_k \\cdot D_{k, t} + u_t$ | $S = \\exp(\\text{residual}_{\\text{week}})$ | **$D_{k, t}$**: week dummies, **$\\gamma_k$**: seasonal residual average. |
+| **$F_3$ - Competitor** | $\\epsilon_t = \\delta_0 + \\delta_1 \\cdot \\text{gap}_t + v_t$ | $C = 1.0 + 0.2 \\cdot \\text{sign}(\\text{gap}) \\cdot \\min(\\|\\text{gap}\\|, 0.5)$ | **$\\text{gap}$**: relative price gap to competitor, **$\\delta_1$**: cross-elasticity residual. |
+| **$F_4$ - Promotions** | $\\epsilon_t = \\theta_0 + \\theta_1 \\cdot \\text{Promo}_t + w_t$ | $\\text{lift}_M = \\theta_1 \\cdot \\log(1 + \\text{spend})$ | **$\\text{Promo}_t$**: active promo flag, **$\\text{spend}$**: marketing adstock. |
+| **$F_5$ - Inventory** | $\\epsilon_t = \\alpha_0 + \\alpha_1 \\cdot \\text{LowStock}_t + z_t$ | $I = 1.15$ (if coverage $< 7$ days) | **$\\text{LowStock}$**: low-stock dummy flag, **$I$**: scarcity demand lift. |
+| **$F_6$ - Lifecycle** | $\\epsilon_t = \\lambda_0 + \\sum \\lambda_p \\cdot \\text{Phase}_{p, t} + \\eta_t$ | $L = \\text{Phase Modifier}$ (Hype vs Mature) | **$\\text{Phase}$**: Launch/Growth/Mature/Decline, **$L$**: lifecycle weight. |
+| **$F_7$ - Sentiment** | $\\epsilon_t = \\omega_0 + \\omega_1 \\cdot X_{\\text{signal}, t} + e_t$ | $X = 1.0 + 0.1 \\cdot X_{\\text{signal}}$ | **$X_{\\text{signal}}$**: CCI relative index signal, **$X$**: buyer confidence modifier. |
+""")
+
+    st.markdown("---")
+    st.subheader("⚖️ Normalized Weights Calculation ($w_i$)")
+    st.markdown("Weights represent the relative explanatory power of each factor model's regression fit, normalized to sum to exactly 1.0:")
+    st.latex(r"w_i = \frac{R^2_i \cdot \mathbb{I}(R^2_i \ge T_i)}{\sum_{j} R^2_j \cdot \mathbb{I}(R^2_j \ge T_j)}")
+    st.markdown("""
+* **$R^2_i$**: Coefficient of determination (r-squared) of factor $i$'s residual regression fit.
+* **$T_i$**: Significance threshold ($T_{\\text{inventory}} = 0.03$, $T_{\\text{seasonality}/ \\text{promotions}/ \\text{sentiment}} = 0.05$).
+* **$\\mathbb{I}(\\cdot)$**: Indicator function (1 if $R^2_i \\ge T_i$, 0 otherwise). Excludes noisy fits from weighting.
+""")
+
+    st.markdown("---")
+    st.subheader("🛡️ Reliability Score Criteria")
+    st.markdown("""
+Reliability measures the statistical robustness of the regression fits using sample size and variance limits:
+* **HIGH CONFIDENCE**: Sourced from high base model parameters with $N \\ge 30$ observations and low variance.
+* **MEDIUM CONFIDENCE**: Active factors with high statistical residuals fit significance ($p \\le 0.05$).
+* **LOW / PROVISIONAL**: Slashed to provisional if:
+  * **Thin Data**: Clean observation count is under 30 ($N < 30$).
+  * **High Parameter Uncertainty**: The 95% Confidence Interval width for baseline elasticity exceeds 1.5 ($\text{CI}_{\\text{width}} > 1.5$), or the absolute baseline elasticity estimate $|e_{\\text{base}}| > 5.0$.
+""")

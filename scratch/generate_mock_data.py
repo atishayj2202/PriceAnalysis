@@ -82,7 +82,8 @@ start_date = datetime.date(2023, 7, 1)
 dates = [start_date + datetime.timedelta(weeks=i) for i in range(156)]
 
 # Root directory for mock data
-MOCK_DATA_ROOT = "/Users/atishayjain/PycharmProjects/PwC/PriceAnalysis/MockData"
+base_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+MOCK_DATA_ROOT = os.path.join(base_dir, "MockData")
 
 def simulate_product_data(category, product_name, config, scenario):
     np.random.seed(42 + hash(product_name + scenario) % 1000)
@@ -220,11 +221,14 @@ def simulate_product_data(category, product_name, config, scenario):
         
         # F. Seasonality (S)
         if product_name == 'ghevar':
-            # Major sale in July15 - Aug15 (weeks 29 to 33)
-            if 29 <= week_of_year <= 33:
-                S = 4.5 + np.random.normal(0, 0.2)
-            else:
-                S = 0.65 + np.random.normal(0, 0.05)
+            # Major sale centered around Teej festival in early August (week 31)
+            # Ramps up gradually from July and peaks at 5.0x, then declines back gradually.
+            center_week = 31.0
+            sigma = 2.2
+            peak_multiplier = 4.3
+            dist = float(week_of_year) - center_week
+            S = 0.70 + peak_multiplier * np.exp(-0.5 * (dist / sigma)**2) + np.random.normal(0, 0.1)
+            S = max(0.5, S)
         else:
             S = 1.0 + config['seasonality_amplitude'] * np.sin(2.0 * np.pi * week_of_year / 52.0)
         

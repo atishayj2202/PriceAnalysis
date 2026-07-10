@@ -56,7 +56,8 @@ def test_model_worked_example():
 
 def test_multi_agent_coordinator():
     print("Running Multi-Agent Coordinator Test...")
-    mock_base_path = "/Users/atishayjain/PycharmProjects/PwC/PriceAnalysis/MockData/electronics/mobile_phone/stable"
+    base_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+    mock_base_path = os.path.join(base_dir, "MockData", "electronics", "mobile_phone", "stable")
     assert os.path.exists(mock_base_path), "Mock data preset path does not exist. Run generate_mock_data.py first."
     
     df_dict = {

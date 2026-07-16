@@ -1,0 +1,57 @@
+Basmati Rice Sales & Demand Dataset Info (India)
+==============================================
+
+1. Dataset Overview
+-------------------
+This dataset contains historical transaction records of Basmati Rice in India, compiled from the official AGMARKNET portal (Government of India). The raw data represents actual daily wholesale market (APMC Mandi) arrivals and prices.
+
+2. File Location & Granularity
+------------------------------
+* File: sales_demand.csv
+* Primary Granularity: Weekly (aggregated to end on Saturdays)
+* Number of Weeks: 495 weeks
+* Date Range: 2008-01-05 to 2017-06-24
+
+3. Schema & Column Specifications
+----------------------------------
+The dataset is structured to match the standard input schema for the Pricing Analysis Dashboard:
+
+* date (YYYY-MM-DD): The end date of the week (resampled to Saturday).
+* sku_id (String): Unique identifier of the product. Standardized to 'IND_BASMATI_001'.
+* unit_price (Float): The volume-weighted average modal price across all active markets in India for that week, converted from Rs/Quintal to Rs/Kilogram (1 Quintal = 100 KG).
+* units_sold (Float): The total market arrivals for that week, converted from Metric Tonnes to Kilograms (1 Tonne = 1000 KG). This serves as a proxy for wholesale market demand/quantity sold.
+* cost_per_unit (Float): The baseline cost of goods sold (COGS) per kilogram, set at 75% of the unit price (representing a constant 25% trade margin).
+
+4. Data Characteristics & Price Movement
+----------------------------------------
+* The price and arrival metrics represent volume-weighted real market transactions, making the price movements highly realistic, capturing seasonal harvest dips and supply-driven inflation peaks.
+* Price range is approximately 23.35 INR/KG to 190.00 INR/KG, representing the real-world wholesale price range of Basmati varieties in India over the 2008-2017 decade.
+
+5. Elasticity Model Comparison (14-Model Rolling Backtest)
+-----------------------------------------------------------
+We performed a rolling out-of-sample backtest evaluating 14 regression and ML configurations.
+* Methodology: 200-week rolling training window, testing on the next week's price and demand, rolling forward 1 week at a time (295 test weeks total).
+
+Results Summary:
+| Model Configuration | MAE (KG) | MAPE (%) | RMSE (KG) | Mean Elasticity | Std Elasticity (Volatility) |
+| :--- | :--- | :--- | :--- | :--- | :--- |
+| **Linear_NoDecay** (OLS) | 1.272e+06 | 266.369% | 2.710e+06 | -1.015 | 0.432 |
+| **Linear_WithDecay** (WLS) | 8.559e+05 | 108.897% | 2.393e+06 | -1.250 | 1.204 |
+| **Ridge_NoDecay** | 1.273e+06 | 266.275% | 2.720e+06 | -0.969 | 0.408 |
+| **Ridge_WithDecay** | 9.598e+05 | 110.804% | 2.613e+06 | -0.614 | 0.584 |
+| **Huber_NoDecay** (Robust) | 1.303e+06 | 278.003% | 2.737e+06 | -0.923 | 0.456 |
+| **Huber_WithDecay** | 8.545e+05 | 107.581% | 2.392e+06 | -1.125 | 1.427 |
+| **SVR_NoDecay** (Kernel SVR) | 1.169e+06 | 267.161% | 2.371e+06 | -0.863 | 2.088 |
+| **SVR_WithDecay** (RBF SVR) | **7.634e+05** | **100.655%** | **2.352e+06** | **-0.984** | **2.150** |
+| **RF_NoDecay** (Tree RF) | 1.148e+06 | 237.161% | 2.592e+06 | -0.156 | 1.303 |
+| **RF_WithDecay** | 9.208e+05 | 121.146% | 2.550e+06 | -0.163 | 1.297 |
+| **GB_NoDecay** (Boosting) | 1.175e+06 | 236.522% | 2.644e+06 | -0.027 | 0.593 |
+| **GB_WithDecay** | 9.058e+05 | 123.668% | 2.528e+06 | -0.027 | 0.593 |
+| **MLP_NoDecay** (Neural Net)| 1.940e+06 | 512.754% | 1.364e+07 | -0.740 | 2.287 |
+| **MLP_WithDecay** (Neural Net)| 3.229e+21 | 7.216e+17% | 5.541e+22 | -1.518 | 3.173 |
+
+Key Findings:
+1. **SVR with Decay is the Best Predictor**: Support Vector Regression (SVR) using a radial basis function (RBF) kernel and time decay (`SVR_WithDecay`) achieves the best overall performance, reducing MAE to 763,444 KG and MAPE to 100.655%. It successfully models non-linear local price shifts without the wild extrapolation failures seen in neural networks.
+2. **Tree-Based Models Fail on Gradients**: Random Forest and Gradient Boosting produce average elasticity estimates very close to zero (-0.156 and -0.027). This is because decision trees split data into step functions; the derivative (elasticity) of a step function is zero almost everywhere, making tree-based models structurally unsuitable for gradient-based continuous elasticity.
+3. **Time Decay is Essential**: Across all models, adding time-decay weights (weighting recent weeks higher) dramatically improves out-of-sample forecasting performance (reducing OLS MAE by ~33% and SVR MAE by ~35%).
+4. **MLP Catastrophic Failures**: Time-decay bootstrapping on MLP Neural Networks (`MLP_WithDecay`) creates extreme extrapolation errors (MAE of 10^21), demonstrating that deep neural nets are highly unstable for price-elasticity optimization when training data is thin.

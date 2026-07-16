@@ -15,7 +15,9 @@ dependencies = [
     "scikit-learn",
     "plotly",
     "openpyxl",
-    "matplotlib"
+    "matplotlib",
+    "seaborn (>=0.13.2,<0.14.0)",
+    "jupyter (>=1.1.1,<2.0.0)"
 ]
 
 

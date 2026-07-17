@@ -55,3 +55,17 @@ Key Findings:
 2. **Tree-Based Models Fail on Gradients**: Random Forest and Gradient Boosting produce average elasticity estimates very close to zero (-0.156 and -0.027). This is because decision trees split data into step functions; the derivative (elasticity) of a step function is zero almost everywhere, making tree-based models structurally unsuitable for gradient-based continuous elasticity.
 3. **Time Decay is Essential**: Across all models, adding time-decay weights (weighting recent weeks higher) dramatically improves out-of-sample forecasting performance (reducing OLS MAE by ~33% and SVR MAE by ~35%).
 4. **MLP Catastrophic Failures**: Time-decay bootstrapping on MLP Neural Networks (`MLP_WithDecay`) creates extreme extrapolation errors (MAE of 10^21), demonstrating that deep neural nets are highly unstable for price-elasticity optimization when training data is thin.
+
+6. Outlier-Handling Alternative Datasets
+-----------------------------------------
+To analyze the impact of extreme demand anomalies (e.g. major harvesting arrival spikes), we generated two alternative versions of the primary `sales_demand.csv` dataset. Outliers are defined as any week where `units_sold > 1.5e+06` KG (1.5M KG).
+
+*   **sales_demand_imputed.csv**:
+    *   *Approach*: Replaces all outlier quantity values (exceeding 1.5M KG) with the median value of the non-outlier records.
+    *   *Result*: Outlier arrival spikes are capped and smoothed to a normal market baseline of 586,000.000 KG.
+    *   *Size*: 495 weeks (same as original, no records removed).
+    *   *Outliers Imputed*: 230 weeks.
+*   **sales_demand_filtered.csv**:
+    *   *Approach*: Removes all weekly records containing outlier arrivals.
+    *   *Result*: A clean dataset containing only normal transactional weeks, free from high-volume anomalies.
+    *   *Size*: 265 weeks (230 outlier records removed).

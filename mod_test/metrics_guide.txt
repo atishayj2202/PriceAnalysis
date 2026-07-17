@@ -18,6 +18,12 @@ This guide explains the metrics used in our rolling elasticity validation and pr
 *   **Meaning**: The average percentage deviation of predictions from actual sales.
 *   **What is a "Good" Value**: While retail goods often target a MAPE under 15%, wholesale commodity markets with high arrival spikes typically see MAPEs between 80% and 130%. A MAPE of ~100% is considered the industry standard for unconstrained agricultural arrivals modeling. SVR_WithDecay leads here at 100.655%.
 
+### Weighted Mean Absolute Percentage Error (WMAPE)
+*   **Formula**: sum(|Actual - Predicted|) / sum(Actual) * 100%
+*   **Range**: [0, +inf) - Lower is better.
+*   **Meaning**: The volume-weighted percentage deviation of predictions from actual sales. It prevents small actual values from causing disproportionately high errors.
+*   **What is a "Good" Value**: A WMAPE below 60% is considered exceptional for highly volatile agricultural wholesale arrivals. SVR_WithDecay achieves the lowest WMAPE of 51.831%.
+
 ### Root Mean Squared Error (RMSE)
 *   **Formula**: sqrt((1 / n) * sum((Actual - Predicted)^2))
 *   **Range**: [0, +inf) - Lower is better.
@@ -48,10 +54,10 @@ To find the best operational model, we rank the configurations using a weighted 
 
 Score = 0.50 * Accuracy_Score + 0.30 * Plausibility_Score + 0.20 * Stability_Score
 
-*   **Accuracy Score (50%)**: Normalized MAPE (lower is better; best model gets 1.0, worst non-exploding model gets 0.0).
+*   **Accuracy Score (50%)**: Average of normalized MAPE and WMAPE scores (lower error is better; best model gets 1.0, worst non-exploding model gets 0.0 for each metric).
 *   **Elasticity Plausibility Score (30%)**:
     *   Score = 1.0: Plausible range (-2.5 <= Mean Elasticity <= -0.8).
-    *   Score = 0.5: Marginally plausible range (-4.0 <= Mean Elasticity < -2.5 or -0.8 < Mean Elasticity <= -0.4).
+    *   Score = 0.5: Margually plausible range (-4.0 <= Mean Elasticity < -2.5 or -0.8 < Mean Elasticity <= -0.4).
     *   Score = 0.0: Price-insensitive (>-0.4) or positive, or extremely negative.
 *   **Elasticity Stability Score (20%)**: Normalized volatility (lower Std gets 1.0, highest Std gets 0.0).
 
@@ -60,22 +66,22 @@ Score = 0.50 * Accuracy_Score + 0.30 * Plausibility_Score + 0.20 * Stability_Sco
 3. Final Model Ranks
 --------------------
 
-| Rank | Model | MAPE (%) | Mean Elasticity | Std Elasticity | Rank Score |
-| :--- | :--- | :---: | :---: | :---: | :---: |
-| 1 | **Linear_WithDecay** (WLS) | 108.897% | -1.250 | 1.204 | **0.905** |
-| 2 | **Huber_WithDecay** (Robust) | 107.581% | -1.125 | 1.427 | **0.883** |
-| 3 | **Ridge_WithDecay** | 110.804% | -0.614 | 0.584 | **0.819** |
-| 4 | **SVR_WithDecay** (RBF) | 100.655% | -0.984 | 2.150 | **0.815** |
-| 5 | **Ridge_NoDecay** | 266.275% | -0.969 | 0.408 | **0.799** |
-| 6 | **Linear_NoDecay** (OLS) | 266.369% | -1.015 | 0.432 | **0.796** |
-| 7 | **Huber_NoDecay** | 278.003% | -0.923 | 0.456 | **0.780** |
-| 8 | **GB_WithDecay** | 123.668% | -0.027 | 0.593 | **0.652** |
-| 9 | **SVR_NoDecay** | 267.161% | -0.863 | 2.088 | **0.619** |
-| 10| **RF_WithDecay** | 121.146% | -0.163 | 1.297 | **0.581** |
-| 11| **GB_NoDecay** | 236.522% | -0.027 | 0.593 | **0.515** |
-| 12| **RF_NoDecay** | 237.161% | -0.156 | 1.303 | **0.439** |
-| 13| **MLP_NoDecay** | 512.754% | -0.740 | 2.287 | **0.150** |
-| 14| **MLP_WithDecay** | 7.216e+17% | -1.518 | 3.173 | **0.000** |
+| Rank | Model | MAPE (%) | WMAPE (%) | RMSE (KG) | Mean Elasticity | Std Elasticity | Rank Score |
+| :---: | :--- | :---: | :---: | :---: | :---: | :---: | :---: |
+| 1 | **Linear_WithDecay** (WLS) | 108.897% | 58.106% | 2.393e+06 | -1.250 | 1.204 | **0.891** |
+| 2 | **Huber_WithDecay** (Robust) | 107.581% | 58.012% | 2.392e+06 | -1.125 | 1.427 | **0.868** |
+| 3 | **SVR_WithDecay** (RBF) | 100.655% | 51.831% | 2.352e+06 | -0.984 | 2.150 | **0.815** |
+| 4 | **Ridge_NoDecay** | 266.275% | 86.450% | 2.720e+06 | -0.969 | 0.408 | **0.791** |
+| 5 | **Linear_NoDecay** (OLS) | 266.369% | 86.325% | 2.710e+06 | -1.015 | 0.432 | **0.789** |
+| 6 | **Ridge_WithDecay** | 110.804% | 65.162% | 2.613e+06 | -0.614 | 0.584 | **0.783** |
+| 7 | **Huber_NoDecay** | 278.003% | 88.462% | 2.737e+06 | -0.923 | 0.456 | **0.773** |
+| 8 | **GB_WithDecay** | 123.668% | 61.495% | 2.528e+06 | -0.027 | 0.593 | **0.636** |
+| 9 | **SVR_NoDecay** | 267.161% | 79.350% | 2.371e+06 | -0.863 | 2.088 | **0.634** |
+| 10| **RF_WithDecay** | 121.146% | 62.512% | 2.550e+06 | -0.163 | 1.297 | **0.560** |
+| 11| **GB_NoDecay** | 236.522% | 79.759% | 2.644e+06 | -0.027 | 0.593 | **0.510** |
+| 12| **RF_NoDecay** | 237.161% | 77.966% | 2.592e+06 | -0.156 | 1.303 | **0.440** |
+| 13| **MLP_NoDecay** | 512.754% | 131.705% | 1.364e+07 | -0.740 | 2.287 | **0.150** |
+| 14| **MLP_WithDecay** | 7.216e+17% | 2.192e+17% | 5.541e+22 | -1.518 | 3.173 | **0.000** |
 
 ---
 

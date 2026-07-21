@@ -3,8 +3,9 @@ import sys
 import streamlit as st
 import pandas as pd
 import numpy as np
+import plotly.graph_objects as go
+import plotly.express as px
 import matplotlib.pyplot as plt
-import seaborn as sns
 
 # Set Page Configuration
 st.set_page_config(
@@ -316,24 +317,34 @@ with tab1:
         </div>
         """, unsafe_allow_html=True)
         
-    # Gross Profit Optimization Chart
-    fig_prof, ax_prof = plt.subplots(figsize=(12, 3.8), facecolor='#0f172a')
-    ax_prof.set_facecolor('#1e293b')
-    ax_prof.tick_params(colors='white')
-    ax_prof.grid(True, linestyle='--', alpha=0.3)
-    ax_prof.spines['top'].set_visible(False)
-    ax_prof.spines['right'].set_visible(False)
-    ax_prof.spines['left'].set_color('#475569')
-    ax_prof.spines['bottom'].set_color('#475569')
-    
-    ax_prof.plot(p_grid, profits_grid / 1e7, color='#10b981', linewidth=2.5, label='Weekly Gross Profit (₹ Cr)')
-    ax_prof.scatter(opt_prof_price_pct, opt_prof_val / 1e7, color='#fbbf24', s=130, zorder=5, label=f'Optimal Profit Peak (₹{opt_prof_price_val:.2f}/kg)')
-    ax_prof.axvline(0.0, color='white', linestyle=':', alpha=0.5, label=f'Current Price (₹{base_price:.2f}/kg)')
-    ax_prof.set_title(f"Gross Profit Optimization Curve for {selected_brand}", color='white', fontweight='bold')
-    ax_prof.set_xlabel("Price Change (%)", color='white')
-    ax_prof.set_ylabel("Gross Profit (₹ Cr)", color='white')
-    ax_prof.legend(facecolor='#1e293b', edgecolor='none', labelcolor='white')
-    st.pyplot(fig_prof)
+    # Plotly Gross Profit Optimization Chart (No Seaborn)
+    fig_prof = go.Figure()
+    fig_prof.add_trace(go.Scatter(
+        x=p_grid, y=profits_grid / 1e7,
+        mode='lines',
+        name='Gross Profit (₹ Cr)',
+        line=dict(color='#10b981', width=3)
+    ))
+    fig_prof.add_trace(go.Scatter(
+        x=[opt_prof_price_pct], y=[opt_prof_val / 1e7],
+        mode='markers+text',
+        name=f'Optimal Profit Peak (₹{opt_prof_price_val:.2f}/kg)',
+        marker=dict(color='#fbbf24', size=14, symbol='star'),
+        text=[f"Max Profit: ₹{opt_prof_val/1e7:.2f} Cr"],
+        textposition="top center"
+    ))
+    fig_prof.add_vline(x=0.0, line_dash="dash", line_color="white", annotation_text=f"Current Base Price (₹{base_price:.2f}/kg)")
+    fig_prof.update_layout(
+        title=f"Gross Profit Optimization Curve for {selected_brand}",
+        xaxis_title="Price Change (%)",
+        yaxis_title="Weekly Gross Profit (₹ Crore)",
+        template="plotly_dark",
+        paper_bgcolor="#0f172a",
+        plot_bgcolor="#1e293b",
+        margin=dict(l=40, r=40, t=50, b=40),
+        height=380
+    )
+    st.plotly_chart(fig_prof, use_container_width=True)
 
     st.markdown("---")
 
@@ -379,24 +390,34 @@ with tab1:
         </div>
         """, unsafe_allow_html=True)
         
-    # Revenue Optimization Chart
-    fig_rev, ax_rev = plt.subplots(figsize=(12, 3.8), facecolor='#0f172a')
-    ax_rev.set_facecolor('#1e293b')
-    ax_rev.tick_params(colors='white')
-    ax_rev.grid(True, linestyle='--', alpha=0.3)
-    ax_rev.spines['top'].set_visible(False)
-    ax_rev.spines['right'].set_visible(False)
-    ax_rev.spines['left'].set_color('#475569')
-    ax_rev.spines['bottom'].set_color('#475569')
-    
-    ax_rev.plot(p_grid, revs_grid / 1e7, color='#38bdf8', linewidth=2.5, label='Weekly Revenue (₹ Cr)')
-    ax_rev.scatter(opt_rev_price_pct, opt_rev_val / 1e7, color='#7dd3fc', s=130, zorder=5, label=f'Optimal Revenue Peak (₹{opt_rev_price_val:.2f}/kg)')
-    ax_rev.axvline(0.0, color='white', linestyle=':', alpha=0.5, label=f'Current Price (₹{base_price:.2f}/kg)')
-    ax_rev.set_title(f"Weekly Revenue Optimization Curve for {selected_brand}", color='white', fontweight='bold')
-    ax_rev.set_xlabel("Price Change (%)", color='white')
-    ax_rev.set_ylabel("Revenue (₹ Cr)", color='white')
-    ax_rev.legend(facecolor='#1e293b', edgecolor='none', labelcolor='white')
-    st.pyplot(fig_rev)
+    # Plotly Revenue Optimization Chart (No Seaborn)
+    fig_rev = go.Figure()
+    fig_rev.add_trace(go.Scatter(
+        x=p_grid, y=revs_grid / 1e7,
+        mode='lines',
+        name='Weekly Revenue (₹ Cr)',
+        line=dict(color='#38bdf8', width=3)
+    ))
+    fig_rev.add_trace(go.Scatter(
+        x=[opt_rev_price_pct], y=[opt_rev_val / 1e7],
+        mode='markers+text',
+        name=f'Optimal Revenue Peak (₹{opt_rev_price_val:.2f}/kg)',
+        marker=dict(color='#7dd3fc', size=14, symbol='diamond'),
+        text=[f"Max Revenue: ₹{opt_rev_val/1e7:.2f} Cr"],
+        textposition="top center"
+    ))
+    fig_rev.add_vline(x=0.0, line_dash="dash", line_color="white", annotation_text=f"Current Base Price (₹{base_price:.2f}/kg)")
+    fig_rev.update_layout(
+        title=f"Weekly Revenue Optimization Curve for {selected_brand}",
+        xaxis_title="Price Change (%)",
+        yaxis_title="Weekly Revenue (₹ Crore)",
+        template="plotly_dark",
+        paper_bgcolor="#0f172a",
+        plot_bgcolor="#1e293b",
+        margin=dict(l=40, r=40, t=50, b=40),
+        height=380
+    )
+    st.plotly_chart(fig_rev, use_container_width=True)
 
 # ---------------------------------------------------------
 # TAB 2: TOP 3 MODELS COMPARISON MATRIX
@@ -424,33 +445,23 @@ with tab2:
     prof3 = (prices_grid - base_cost) * q3
     rev3 = prices_grid * q3
     
-    fig_comp, (ax_c_rev, ax_c_prof) = plt.subplots(1, 2, figsize=(14, 5), facecolor='#0f172a')
-    for ax in [ax_c_rev, ax_c_prof]:
-        ax.set_facecolor('#1e293b')
-        ax.tick_params(colors='white')
-        ax.grid(True, linestyle='--', alpha=0.3)
-        ax.spines['top'].set_visible(False)
-        ax.spines['right'].set_visible(False)
-        ax.spines['left'].set_color('#475569')
-        ax.spines['bottom'].set_color('#475569')
-        
-    ax_c_rev.plot(p_grid, rev1 / 1e7, color='#fbbf24', linewidth=2.5, label=f"Rank 1: {m1['model']}")
-    ax_c_rev.plot(p_grid, rev2 / 1e7, color='#38bdf8', linewidth=2.5, linestyle='--', label=f"Rank 2: {m2['model']}")
-    ax_c_rev.plot(p_grid, rev3 / 1e7, color='#c084fc', linewidth=2.5, linestyle=':', label=f"Rank 3: {m3['model']}")
-    ax_c_rev.set_title("Revenue Optimization Comparison", color='white', fontweight='bold')
-    ax_c_rev.set_xlabel("Price Change (%)", color='white')
-    ax_c_rev.set_ylabel("Weekly Revenue (₹ Crore)", color='white')
-    ax_c_rev.legend(facecolor='#1e293b', edgecolor='none', labelcolor='white')
+    # Overlaid Revenue & Gross Profit Comparison Curves using Plotly (No Seaborn)
+    fig_comp = go.Figure()
+    fig_comp.add_trace(go.Scatter(x=p_grid, y=prof1/1e7, mode='lines', name=f"Rank 1: {m1['model']} (Max: {p_grid[np.argmax(prof1)]:+.1f}%)", line=dict(color='#fbbf24', width=3)))
+    fig_comp.add_trace(go.Scatter(x=p_grid, y=prof2/1e7, mode='lines', name=f"Rank 2: {m2['model']} (Max: {p_grid[np.argmax(prof2)]:+.1f}%)", line=dict(color='#38bdf8', width=3, dash='dash')))
+    fig_comp.add_trace(go.Scatter(x=p_grid, y=prof3/1e7, mode='lines', name=f"Rank 3: {m3['model']} (Max: {p_grid[np.argmax(prof3)]:+.1f}%)", line=dict(color='#c084fc', width=3, dash='dot')))
     
-    ax_c_prof.plot(p_grid, prof1 / 1e7, color='#fbbf24', linewidth=2.5, label=f"Rank 1: {m1['model']} (Max: {p_grid[np.argmax(prof1)]:+.1f}%)")
-    ax_c_prof.plot(p_grid, prof2 / 1e7, color='#38bdf8', linewidth=2.5, linestyle='--', label=f"Rank 2: {m2['model']} (Max: {p_grid[np.argmax(prof2)]:+.1f}%)")
-    ax_c_prof.plot(p_grid, prof3 / 1e7, color='#c084fc', linewidth=2.5, linestyle=':', label=f"Rank 3: {m3['model']} (Max: {p_grid[np.argmax(prof3)]:+.1f}%)")
-    ax_c_prof.set_title("Gross Profit Optimization Comparison", color='white', fontweight='bold')
-    ax_c_prof.set_xlabel("Price Change (%)", color='white')
-    ax_c_prof.set_ylabel("Weekly Gross Profit (₹ Crore)", color='white')
-    ax_c_prof.legend(facecolor='#1e293b', edgecolor='none', labelcolor='white')
-    
-    st.pyplot(fig_comp)
+    fig_comp.update_layout(
+        title="Gross Profit Optimization Comparison across Top 3 Models",
+        xaxis_title="Price Change (%)",
+        yaxis_title="Gross Profit (₹ Crore)",
+        template="plotly_dark",
+        paper_bgcolor="#0f172a",
+        plot_bgcolor="#1e293b",
+        margin=dict(l=40, r=40, t=50, b=40),
+        height=400
+    )
+    st.plotly_chart(fig_comp, use_container_width=True)
     
     comp_matrix = pd.DataFrame({
         "Metric": [
@@ -525,19 +536,27 @@ with tab3:
         weekly_pattern = brand_df.groupby('week_of_year')['units_sold'].mean()
         weekly_pattern_norm = weekly_pattern / weekly_pattern.mean()
         
-        fig_seas, ax_s = plt.subplots(figsize=(7, 4.5), facecolor='#0f172a')
-        ax_s.set_facecolor('#1e293b')
-        ax_s.plot(weekly_pattern_norm.index, weekly_pattern_norm.values, color='#c084fc', linewidth=2.5)
-        ax_s.axhline(1.0, color='white', linestyle=':', alpha=0.5, label='Baseline Demand (1.0x)')
-        ax_s.set_title(f"{selected_brand} Seasonal Demand Multiplier", color='white', fontweight='bold')
-        ax_s.set_xlabel("Week of Year (1 to 52)", color='white')
-        ax_s.set_ylabel("Seasonal Multiplier (x)", color='white')
-        ax_s.tick_params(colors='white')
-        ax_s.grid(True, linestyle='--', alpha=0.3)
-        ax_s.spines['top'].set_visible(False)
-        ax_s.spines['right'].set_visible(False)
-        ax_s.legend(facecolor='#1e293b', edgecolor='none', labelcolor='white')
-        st.pyplot(fig_seas)
+        # Plotly Seasonal Chart (No Seaborn)
+        fig_s = go.Figure()
+        fig_s.add_trace(go.Scatter(
+            x=list(weekly_pattern_norm.index),
+            y=list(weekly_pattern_norm.values),
+            mode='lines',
+            name='Seasonal Multiplier',
+            line=dict(color='#c084fc', width=3)
+        ))
+        fig_s.add_hline(y=1.0, line_dash="dot", line_color="white", annotation_text="Baseline Demand (1.0x)")
+        fig_s.update_layout(
+            title=f"{selected_brand} Seasonal Demand Multiplier",
+            xaxis_title="Week of Year (1 to 52)",
+            yaxis_title="Seasonal Multiplier (x)",
+            template="plotly_dark",
+            paper_bgcolor="#0f172a",
+            plot_bgcolor="#1e293b",
+            margin=dict(l=40, r=40, t=50, b=40),
+            height=380
+        )
+        st.plotly_chart(fig_s, use_container_width=True)
         
     with col_s2:
         st.subheader("Seasonal Accuracy & Value Summary")
@@ -559,29 +578,21 @@ with tab4:
     
     brand_df = df_raw[df_raw['brand'] == selected_brand].copy()
     
-    fig_diag, (ax_p_ts, ax_q_ts) = plt.subplots(2, 1, figsize=(14, 6), sharex=True, facecolor='#0f172a')
-    for ax in [ax_p_ts, ax_q_ts]:
-        ax.set_facecolor('#1e293b')
-        ax.tick_params(colors='white')
-        ax.grid(True, linestyle='--', alpha=0.3)
-        ax.spines['top'].set_visible(False)
-        ax.spines['right'].set_visible(False)
-        ax.spines['left'].set_color('#475569')
-        ax.spines['bottom'].set_color('#475569')
-        
-    ax_p_ts.plot(brand_df['date'], brand_df['unit_price'], color='#38bdf8', linewidth=2, label='Retail Price (₹/kg)')
-    ax_p_ts.plot(brand_df['date'], brand_df['cost_per_unit'], color='#94a3b8', linestyle='--', label='Wholesale COGS (₹/kg)')
-    ax_p_ts.set_title(f"{selected_brand} Historical Retail Price vs. COGS", color='white', fontweight='bold')
-    ax_p_ts.set_ylabel("Price (₹/kg)", color='white')
-    ax_p_ts.legend(facecolor='#1e293b', edgecolor='none', labelcolor='white')
-    
-    ax_q_ts.plot(brand_df['date'], brand_df['units_sold']/1e3, color='#34d399', linewidth=1.5, label='Actual Sales Volume (k KG)')
-    ax_q_ts.set_title(f"{selected_brand} Weekly Sales Demand Volume", color='white', fontweight='bold')
-    ax_q_ts.set_xlabel("Date", color='white')
-    ax_q_ts.set_ylabel("Volume (k KG)", color='white')
-    ax_q_ts.legend(facecolor='#1e293b', edgecolor='none', labelcolor='white')
-    
-    st.pyplot(fig_diag)
+    # Plotly Time Series Chart (No Seaborn)
+    fig_ts = go.Figure()
+    fig_ts.add_trace(go.Scatter(x=brand_df['date'], y=brand_df['unit_price'], mode='lines', name='Retail Price (₹/kg)', line=dict(color='#38bdf8', width=2)))
+    fig_ts.add_trace(go.Scatter(x=brand_df['date'], y=brand_df['cost_per_unit'], mode='lines', name='Wholesale COGS (₹/kg)', line=dict(color='#94a3b8', width=2, dash='dash')))
+    fig_ts.update_layout(
+        title=f"{selected_brand} Historical Retail Price vs. COGS",
+        xaxis_title="Date",
+        yaxis_title="Price (₹/kg)",
+        template="plotly_dark",
+        paper_bgcolor="#0f172a",
+        plot_bgcolor="#1e293b",
+        margin=dict(l=40, r=40, t=50, b=40),
+        height=380
+    )
+    st.plotly_chart(fig_ts, use_container_width=True)
 
 st.markdown("---")
-st.caption("Branded Rice Pricing Engine | Dynamic Profit & Revenue Strategy Dashboard")
+st.caption("Branded Rice Pricing Engine | Interactive Plotly Dashboard (No Seaborn)")

@@ -21,11 +21,9 @@ It covers:
     imports_code = """import pandas as pd
 import numpy as np
 import matplotlib.pyplot as plt
-import seaborn as sns
 from datetime import datetime
 
 # Set style for charts
-sns.set_theme(style="whitegrid")
 plt.rcParams["figure.figsize"] = (12, 6)
 plt.rcParams["font.size"] = 11
 
@@ -43,85 +41,80 @@ print("--- SUMMARY STATISTICS ---")
 summary = df.groupby("brand").agg({
     "unit_price": ["min", "mean", "max", "std"],
     "units_sold": ["min", "mean", "max", "sum"],
-    "cost_per_unit": ["mean"]
+    "cost_per_unit": ["min", "mean", "max"]
 })
-# Calculate average gross margin: (price - cost) / price
-margins = {}
-for brand in df['brand'].unique():
-    b_df = df[df['brand'] == brand]
-    margin = ((b_df['unit_price'] - b_df['cost_per_unit']) / b_df['unit_price']).mean() * 100
-    margins[brand] = f"{margin:.1f}%"
-
-print(summary)
-print("\\nAverage Gross Margins:", margins)"""
+print(summary)"""
     nb.cells.append(nbf.v4.new_code_cell(summary_code))
     
     # 4. Price Trends Plot
-    price_plot_code = """# Price Trends Over Time
-plt.figure(figsize=(14, 6))
-sns.lineplot(data=df, x='date', y='unit_price', hue='brand', linewidth=2, palette='Set1')
-plt.title("Retail Price Trends for Branded Basmati Rice (2021 - 2025)", fontsize=14, fontweight='bold')
+    price_code = """# 1. Retail Price Trends (2021 - 2025)
+plt.figure(figsize=(12, 5))
+for brand, bdf in df.groupby('brand'):
+    plt.plot(bdf['date'], bdf['unit_price'], label=brand, linewidth=2)
+plt.title("Retail Price Trends for Branded Basmati Rice (2021-2025)")
 plt.xlabel("Date")
 plt.ylabel("Retail Price (INR/KG)")
-plt.legend(title="Brand", frameon=True)
+plt.grid(True, linestyle='--', alpha=0.5)
+plt.legend()
 plt.tight_layout()
 plt.show()"""
-    nb.cells.append(nbf.v4.new_code_cell(price_plot_code))
+    nb.cells.append(nbf.v4.new_code_cell(price_code))
     
     # 5. Quantity Trends Plot
-    qty_plot_code = """# Demand (Quantity Sold) Trends Over Time
-plt.figure(figsize=(14, 6))
-sns.lineplot(data=df, x='date', y='units_sold', hue='brand', linewidth=1.5, alpha=0.8, palette='Set1')
-plt.title("Weekly Sales Volume (Demand) Trends (2021 - 2025)", fontsize=14, fontweight='bold')
+    qty_code = """# 2. Sales Demand Volumes (2021 - 2025)
+plt.figure(figsize=(12, 5))
+for brand, bdf in df.groupby('brand'):
+    plt.plot(bdf['date'], bdf['units_sold'] / 1e3, label=brand, linewidth=1.5, alpha=0.8)
+plt.title("Weekly Sales Volume (Demand Proxy) (2021-2025)")
 plt.xlabel("Date")
-plt.ylabel("Quantity Sold (KG)")
-plt.legend(title="Brand", frameon=True)
+plt.ylabel("Weekly Volume Sold (1,000s KG)")
+plt.grid(True, linestyle='--', alpha=0.5)
+plt.legend()
 plt.tight_layout()
 plt.show()"""
-    nb.cells.append(nbf.v4.new_code_cell(qty_plot_code))
+    nb.cells.append(nbf.v4.new_code_cell(qty_code))
     
     # 6. Seasonality Analysis
-    seasonality_code = """# Monthly Seasonality Analysis
-df['month'] = df['date'].dt.strftime('%m-%B')
-monthly_sales = df.groupby(['brand', 'month'])['units_sold'].mean().reset_index()
+    season_code = """# 3. Monthly Demand Seasonality
+df['month'] = df['date'].dt.month
+monthly_sales = df.groupby(['month', 'brand'])['units_sold'].mean().unstack()
 
-plt.figure(figsize=(14, 6))
-sns.barplot(data=monthly_sales, x='month', y='units_sold', hue='brand', palette='Set1')
-plt.title("Average Sales Volume by Month (Seasonality)", fontsize=14, fontweight='bold')
-plt.xticks(rotation=45)
-plt.xlabel("Month")
-plt.ylabel("Avg Quantity Sold (KG)")
+plt.figure(figsize=(12, 5))
+monthly_sales.plot(kind='bar', figsize=(12, 5), width=0.8)
+plt.title("Average Monthly Volume Demand (Seasonality Pattern)")
+plt.xlabel("Month of Year (1=Jan, 12=Dec)")
+plt.ylabel("Average Weekly Volume (KG)")
+plt.grid(True, linestyle='--', alpha=0.5)
 plt.legend(title="Brand")
 plt.tight_layout()
 plt.show()"""
-    nb.cells.append(nbf.v4.new_code_cell(seasonality_code))
+    nb.cells.append(nbf.v4.new_code_cell(season_code))
     
     # 7. Price vs Quantity Scatter Plot (Elasticity Visual)
-    elasticity_plot_code = """# Price vs. Quantity Log-Log Scatter Plot with Regression Line
-fig, axes = plt.subplots(1, 3, figsize=(18, 6), sharey=False)
+    elast_code = """# 4. Log-Log Price vs Quantity Regression Lines (Elasticity Visual)
+fig, axes = plt.subplots(1, 3, figsize=(16, 5), sharey=True)
+
 brands = df['brand'].unique()
-
 for idx, brand in enumerate(brands):
-    b_df = df[df['brand'] == brand]
+    bdf = df[df['brand'] == brand]
+    log_p = np.log(bdf['unit_price'])
+    log_q = np.log(bdf['units_sold'])
     
-    # Log transform
-    log_p = np.log(b_df['unit_price'])
-    log_q = np.log(b_df['units_sold'])
+    # Fit linear regression
+    slope, intercept = np.polyfit(log_p, log_q, 1)
     
-    sns.regplot(x=log_p, y=log_q, ax=axes[idx], color='teal', 
-                scatter_kws={'alpha':0.4, 's':25}, line_kws={'color':'red', 'linewidth':2})
-    
-    # Calculate simple correlation
     corr = np.corrcoef(log_p, log_q)[0, 1]
-    
-    axes[idx].set_title(f"{brand} (Corr: {corr:.2f})", fontsize=12, fontweight='bold')
-    axes[idx].set_xlabel("Log(Price)")
-    axes[idx].set_ylabel("Log(Quantity)")
+    axes[idx].set_title(f"{brand}\\nSlope: {slope:.3f} | Corr: {corr:.3f}")
+    axes[idx].set_xlabel("log(Unit Price)")
+    if idx == 0:
+        axes[idx].set_ylabel("log(Units Sold)")
+    axes[idx].grid(True, linestyle='--', alpha=0.5)
+    axes[idx].legend()
 
-plt.suptitle("Log-Log Price vs. Quantity Relationship (Elasticity Slope)", fontsize=14, fontweight='bold', y=1.02)
+plt.suptitle("Log-Log Price Elasticity Curves by Brand", y=1.02, fontsize=14)
 plt.tight_layout()
 plt.show()"""
-    nb.cells.append(nbf.v4.new_code_cell(elasticity_plot_code))
+    nb.cells.append(nbf.v4.new_code_cell(elast_code))
     
     # 8. Explanatory Markdown
     explanations_text = """### Key Insights from EDA:

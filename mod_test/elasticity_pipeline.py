@@ -354,7 +354,28 @@ class ElasticityPipeline:
         stability = np.clip(1.0 - (std_elast - 0.2) / 1.8, 0.0, 1.0)
         
         avg_k = np.mean(adaptive_k_list) if adaptive_k_list else np.nan
-        
+
+        # Calculate seasonality accuracy metrics
+        if seasonality_approach == "baseline":
+            seasonal_r2 = 0.0
+        else:
+            try:
+                res_base = sm.OLS(self.df['log_q'], sm.add_constant(self.df['log_p'])).fit().resid
+                if seasonality_approach == "adaptive":
+                    # Use avg_k for adaptive
+                    k_val = int(np.round(avg_k)) if not np.isnan(avg_k) else 2
+                    fourier_full = SeasonalityEngine.create_fourier_features(np.arange(len(self.df)), period=52, K=k_val)
+                else:
+                    fourier_full = SeasonalityEngine.get_features(len(self.df), approach=seasonality_approach)
+                    
+                if fourier_full is not None and not fourier_full.empty:
+                    m_seas = sm.OLS(res_base, sm.add_constant(fourier_full)).fit()
+                    seasonal_r2 = float(m_seas.rsquared)
+                else:
+                    seasonal_r2 = 0.0
+            except Exception:
+                seasonal_r2 = 0.0
+
         return {
             "model": model_name,
             "seasonality": seasonality_approach,
@@ -366,6 +387,7 @@ class ElasticityPipeline:
             "std_elasticity": std_elast,
             "plausibility": plausibility,
             "stability": stability,
+            "seasonal_r2": seasonal_r2,
             "avg_adaptive_k": avg_k
         }
 
@@ -412,6 +434,18 @@ def run_pipeline():
                     
     df_results = pd.DataFrame(results)
     
+    # Calculate seasonal WMAPE gain relative to baseline (no seasonality)
+    def calc_wmape_gain(row):
+        b = row['brand']
+        m = row['model']
+        d = row['decay']
+        base = df_results[(df_results['brand'] == b) & (df_results['model'] == m) & (df_results['decay'] == d) & (df_results['seasonality'] == 'baseline')]
+        if not base.empty:
+            return base['WMAPE'].values[0] - row['WMAPE']
+        return 0.0
+        
+    df_results['seasonal_wmape_gain'] = df_results.apply(calc_wmape_gain, axis=1)
+    
     # Save raw results
     out_csv = "/Users/atishayjain/PycharmProjects/PwC/PriceAnalysis/mod_test/pipeline_results.csv"
     df_results.to_csv(out_csv, index=False)
@@ -420,7 +454,7 @@ def run_pipeline():
     # Summarize best models overall
     print("\n--- TOP 10 MODEL CONFIGURATIONS OVERALL ---")
     df_top = df_results.sort_values(by="Rank_Score", ascending=False).head(10)
-    print(df_top[["brand", "model", "seasonality", "decay", "WMAPE", "MAPE", "mean_elasticity", "std_elasticity", "Rank_Score"]].to_string(index=False))
+    print(df_top[["brand", "model", "seasonality", "decay", "WMAPE", "seasonal_r2", "seasonal_wmape_gain", "mean_elasticity", "Rank_Score"]].to_string(index=False))
     
     # Summarize best models per brand
     for brand in brands:

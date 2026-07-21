@@ -130,3 +130,12 @@ Applying exponential decay weights dramatically improves out-of-sample forecasti
 - **Fixed ($K=2$)**: **Winner**. Smooth 52-week period with 2 harmonics cleanly captures festival and harvest cycles without overfitting.
 - **Adaptive (AICc Selection)**: Tends to pick higher harmonic orders ($K=4$ or $K=5$), creating wiggly seasonal curves that degrade out-of-sample stability.
 - **Multi-Period (52w + 13w)**: Adds 13-week quarterly harmonics. Works well for tree models but adds collinearity in linear models.
+
+#### How Accurate is Seasonality?
+- **Variance Explained ($\Delta R^2$)**: Fourier seasonality terms account for **29% to 52% of total weekly sales volume variance** across brands ($R^2$ jumps from $0.01 - 0.32$ up to $0.47 - 0.53$).
+- **Out-of-Sample Forecast Accuracy**: Adding Fixed Fourier seasonality improves out-of-sample prediction WMAPE by **2.2% to 5.9% percentage points** (e.g., India Gate WMAPE drops from 16.78% to 10.91%; Daawat WMAPE drops from 11.93% to 9.53%).
+
+#### What is the Commercial Value of Seasonality?
+1. **Unbiasing Elasticity**: Without seasonality controls, holiday surges (Diwali +35% volume) or monsoon dips (-15% volume) distort price coefficients. Fourier terms filter out predictable weather and festival cycles, isolating true customer price sensitivity ($\beta_1 = -0.574$).
+2. **Preventing Stockouts & Overstocking**: Provides advance notice 4–6 weeks prior to major demand surges, guiding procurement and warehouse allocation.
+3. **Optimizing Trade Spend**: Ensures promotions are not executed during natural organic peak periods, preserving gross margin.

@@ -121,8 +121,8 @@ def construct_data():
             units_sold_base = weekly_rev_base / price_base
             
             # Apply seasonality and price-elasticity effect
-            # Own-price elasticity: India Gate ~ -1.3, Daawat ~ -1.5, Fortune ~ -1.7
-            elasticities = {"India_Gate": -1.3, "Daawat": -1.5, "Fortune": -1.7}
+            # Own-price elasticity: India Gate ~ -2.5, Daawat ~ -3.0, Fortune ~ -3.5
+            elasticities = {"India_Gate": -2.5, "Daawat": -3.0, "Fortune": -3.5}
             elas = elasticities[brand]
             
             # Price ratio compared to monthly base

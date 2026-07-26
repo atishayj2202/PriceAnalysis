@@ -1,0 +1,30 @@
+{
+  "Asus": {
+    "PyTorch Deep Neural Network (MLP)": -4.8261,
+    "Temporal LSTM-Attention Network": -4.8261,
+    "LightGBM Gradient Boosted Ensemble": -4.8261,
+    "Deep Q-Network (DQN) RL Agent": -4.8261,
+    "Neuro-Boost Learned Stacking Hybrid": -4.8261
+  },
+  "Dell": {
+    "PyTorch Deep Neural Network (MLP)": -3.7748,
+    "Temporal LSTM-Attention Network": -3.7748,
+    "LightGBM Gradient Boosted Ensemble": -3.7748,
+    "Deep Q-Network (DQN) RL Agent": -3.7748,
+    "Neuro-Boost Learned Stacking Hybrid": -3.7748
+  },
+  "HP": {
+    "PyTorch Deep Neural Network (MLP)": -4.2951,
+    "Temporal LSTM-Attention Network": -4.2951,
+    "LightGBM Gradient Boosted Ensemble": -4.2951,
+    "Deep Q-Network (DQN) RL Agent": -4.2951,
+    "Neuro-Boost Learned Stacking Hybrid": -4.2951
+  },
+  "Lenovo": {
+    "PyTorch Deep Neural Network (MLP)": -4.5068,
+    "Temporal LSTM-Attention Network": -4.5068,
+    "LightGBM Gradient Boosted Ensemble": -4.5068,
+    "Deep Q-Network (DQN) RL Agent": -4.5068,
+    "Neuro-Boost Learned Stacking Hybrid": -4.5068
+  }
+}

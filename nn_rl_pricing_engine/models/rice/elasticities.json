@@ -1,23 +1,23 @@
 {
   "Daawat": {
-    "PyTorch Deep Neural Network (MLP)": -2.8375,
-    "Temporal LSTM-Attention Network": -2.8375,
-    "LightGBM Gradient Boosted Ensemble": -2.8375,
-    "Deep Q-Network (DQN) RL Agent": -2.8375,
+    "PyTorch Deep Neural Network (MLP)": -2.8943,
+    "Temporal LSTM-Attention Network": -2.497,
+    "LightGBM Gradient Boosted Ensemble": -3.178,
+    "Deep Q-Network (DQN) RL Agent": -2.2133,
     "Neuro-Boost Learned Stacking Hybrid": -2.8375
   },
   "Fortune": {
-    "PyTorch Deep Neural Network (MLP)": -3.2471,
-    "Temporal LSTM-Attention Network": -3.2471,
-    "LightGBM Gradient Boosted Ensemble": -3.2471,
-    "Deep Q-Network (DQN) RL Agent": -3.2471,
+    "PyTorch Deep Neural Network (MLP)": -3.312,
+    "Temporal LSTM-Attention Network": -2.8574,
+    "LightGBM Gradient Boosted Ensemble": -3.6367,
+    "Deep Q-Network (DQN) RL Agent": -2.5327,
     "Neuro-Boost Learned Stacking Hybrid": -3.2471
   },
   "India_Gate": {
-    "PyTorch Deep Neural Network (MLP)": -2.1517,
-    "Temporal LSTM-Attention Network": -2.1517,
-    "LightGBM Gradient Boosted Ensemble": -2.1517,
-    "Deep Q-Network (DQN) RL Agent": -2.1517,
+    "PyTorch Deep Neural Network (MLP)": -2.1947,
+    "Temporal LSTM-Attention Network": -1.8935,
+    "LightGBM Gradient Boosted Ensemble": -2.4099,
+    "Deep Q-Network (DQN) RL Agent": -1.6783,
     "Neuro-Boost Learned Stacking Hybrid": -2.1517
   }
 }

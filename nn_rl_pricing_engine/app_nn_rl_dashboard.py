@@ -618,10 +618,11 @@ with c5:
     st.markdown("<div class='metric-card' style='border-left-color:#fbbf24;'><b>⚡ Neuro-Boost</b><span class='fix-badge'>STACKED</span><br><span style='font-size:0.8rem; color:#fbbf24;'>Learned Ridge Stacking</span></div>", unsafe_allow_html=True)
 
 # Tabs Wiring
-tab1, tab_delta, tab2, tab3, tab4 = st.tabs([
+tab1, tab_delta, tab2, tab_eda, tab3, tab4 = st.tabs([
     "🏠 Home: Profit & Revenue Optimization",
     "📊 Selection Change & Delta Analysis",
     "⚔️ 5-Model Industry Benchmark Matrix",
+    "📈 Exploratory Data Analysis (EDA)",
     "🔬 Deep Research & Architecture Diagnostics",
     "📋 Historical Dataset Rows"
 ])
@@ -877,6 +878,60 @@ with tab2:
         st.plotly_chart(fig_comp_qty, width='stretch')
     else:
         st.info("Run `python nn_rl_pricing_engine/train_models.py` to populate pipeline results.")
+
+# ---------------------------------------------------------
+# TAB EDA: EXPLORATORY DATA ANALYSIS
+# ---------------------------------------------------------
+with tab_eda:
+    st.header(f"📈 Exploratory Data Analysis: {domain_title}")
+    st.markdown("Comprehensive statistical and graphical exploration of prices, volume, seasonality, and price elasticity.")
+    
+    col_eda1, col_eda2 = st.columns(2)
+    
+    with col_eda1:
+        st.subheader("1. Historical Price Trends")
+        fig_p = px.line(
+            df_raw, x="date", y="unit_price", color="brand",
+            title=f"Unit Price Trends ({domain_title})",
+            labels={"unit_price": f"Price ({price_unit})", "date": "Date"},
+            template="plotly_dark"
+        )
+        st.plotly_chart(fig_p, width='stretch')
+        
+    with col_eda2:
+        st.subheader("2. Weekly Demand Volume Trends")
+        fig_v = px.line(
+            df_raw, x="date", y="units_sold", color="brand",
+            title=f"Weekly Units Sold ({domain_title})",
+            labels={"units_sold": "Units Sold", "date": "Date"},
+            template="plotly_dark"
+        )
+        st.plotly_chart(fig_v, width='stretch')
+
+    col_eda3, col_eda4 = st.columns(2)
+    
+    with col_eda3:
+        st.subheader("3. Monthly Demand Seasonality")
+        df_raw['month'] = pd.to_datetime(df_raw['date']).dt.month
+        monthly_avg = df_raw.groupby(['month', 'brand'])['units_sold'].mean().reset_index()
+        fig_m = px.bar(
+            monthly_avg, x="month", y="units_sold", color="brand", barmode="group",
+            title="Average Monthly Volume Demand",
+            labels={"month": "Month of Year (1-12)", "units_sold": "Avg Weekly Units"},
+            template="plotly_dark"
+        )
+        st.plotly_chart(fig_m, width='stretch')
+        
+    with col_eda4:
+        st.subheader("4. Feature Correlation Matrix")
+        num_cols = df_raw.select_dtypes(include=[np.number]).columns
+        corr = df_raw[num_cols].corr()
+        fig_c = px.imshow(
+            corr, text_auto=".2f", aspect="auto",
+            title="Dataset Feature Correlation Heatmap",
+            color_continuous_scale="Blues", template="plotly_dark"
+        )
+        st.plotly_chart(fig_c, width='stretch')
 
 # ---------------------------------------------------------
 # TAB 4: DEEP RESEARCH DIAGNOSTICS

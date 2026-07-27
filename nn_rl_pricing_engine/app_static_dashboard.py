@@ -38,7 +38,7 @@ st.markdown("""
 <style>
     .main {
         background-color: #0b0f19;
-        color: #f8fafc;
+        color: #ffffff;
     }
     .metric-card {
         background: linear-gradient(135deg, #1e293b 0%, #0f172a 100%);
@@ -47,24 +47,29 @@ st.markdown("""
         border-left: 5px solid #38bdf8;
         box-shadow: 0 4px 15px rgba(0, 0, 0, 0.4);
         margin-bottom: 15px;
+        color: #ffffff !important;
     }
     .metric-value {
         font-size: 1.8rem;
         font-weight: 800;
-        color: #ffffff;
+        color: #ffffff !important;
         margin-top: 4px;
     }
     .metric-label {
-        font-size: 0.82rem;
-        color: #cbd5e1;
+        font-size: 0.85rem;
+        color: #f8fafc !important;
         text-transform: uppercase;
         letter-spacing: 0.08em;
-        font-weight: 600;
+        font-weight: 700;
     }
     .metric-base {
-        font-size: 0.85rem;
-        color: #94a3b8;
-        margin-top: 2px;
+        font-size: 0.88rem;
+        color: #e2e8f0 !important;
+        margin-top: 4px;
+        font-weight: 600;
+    }
+    .metric-base b, .metric-base span {
+        color: #ffffff !important;
     }
     .kpi-change-card {
         background: linear-gradient(135deg, #1e293b 0%, #0f172a 100%);
@@ -73,19 +78,26 @@ st.markdown("""
         border-top: 4px solid #38bdf8;
         box-shadow: 0 4px 18px rgba(0, 0, 0, 0.4);
         margin-bottom: 15px;
+        color: #ffffff !important;
     }
     .kpi-change-title {
         font-size: 0.85rem;
-        font-weight: 700;
-        color: #e2e8f0;
+        font-weight: 800;
+        color: #f8fafc !important;
         text-transform: uppercase;
         letter-spacing: 0.08em;
     }
     .kpi-change-val {
         font-size: 1.9rem;
-        font-weight: 800;
-        color: #ffffff;
+        font-weight: 900;
+        color: #ffffff !important;
         margin-top: 4px;
+    }
+    .kpi-subtext {
+        font-size: 0.85rem;
+        color: #e2e8f0 !important;
+        margin-top: 4px;
+        font-weight: 500;
     }
     .profit-section-card {
         background: linear-gradient(135deg, #065f46 0%, #022c22 100%);
@@ -94,6 +106,7 @@ st.markdown("""
         padding: 22px;
         box-shadow: 0 6px 20px rgba(16, 185, 129, 0.25);
         margin-bottom: 20px;
+        color: #ffffff !important;
     }
     .revenue-section-card {
         background: linear-gradient(135deg, #0369a1 0%, #0c4a6e 100%);
@@ -102,31 +115,32 @@ st.markdown("""
         padding: 22px;
         box-shadow: 0 6px 20px rgba(56, 189, 248, 0.25);
         margin-bottom: 20px;
+        color: #ffffff !important;
     }
     .section-title-profit {
         font-size: 1.1rem;
         font-weight: 800;
-        color: #34d399;
+        color: #34d399 !important;
         text-transform: uppercase;
         letter-spacing: 0.1em;
     }
     .section-title-revenue {
         font-size: 1.1rem;
         font-weight: 800;
-        color: #7dd3fc;
+        color: #7dd3fc !important;
         text-transform: uppercase;
         letter-spacing: 0.1em;
     }
     .hero-price {
         font-size: 2.4rem;
         font-weight: 900;
-        color: #ffffff;
+        color: #ffffff !important;
         margin-top: 4px;
     }
     .fix-badge {
         display: inline-block;
         background: #10b981;
-        color: #ffffff;
+        color: #ffffff !important;
         padding: 2px 8px;
         border-radius: 6px;
         font-size: 0.7rem;
@@ -482,13 +496,13 @@ with tab_delta:
 
     c_d1, c_d2, c_d3, c_d4 = st.columns(4)
     with c_d1:
-        st.markdown(f"<div class='kpi-change-card'><b>1. RETAIL PRICE</b><br><div class='kpi-change-val'>{price_unit} {custom_p:,.2f}</div>Baseline: {price_unit} {base_price:,.2f}<br><b>Shift: {user_pct:+.1f}%</b></div>", unsafe_allow_html=True)
+        st.markdown(f"<div class='kpi-change-card'><div class='kpi-change-title'>1. RETAIL PRICE</div><div class='kpi-change-val'>{price_unit} {custom_p:,.2f}</div><div class='kpi-subtext'>Baseline: <b style='color:#ffffff;'>{price_unit} {base_price:,.2f}</b></div><div class='kpi-subtext'><b style='color:#38bdf8;'>Shift: {user_pct:+.1f}%</b></div></div>", unsafe_allow_html=True)
     with c_d2:
-        st.markdown(f"<div class='kpi-change-card'><b>2. DEMAND QUANTITY (Q_new)</b><br><div class='kpi-change-val'>{custom_q:,.0f} {unit_label}</div>Baseline: {base_qty:,.0f}<br><b>Change: {pct_change_qty:+.1f}%</b></div>", unsafe_allow_html=True)
+        st.markdown(f"<div class='kpi-change-card'><div class='kpi-change-title'>2. DEMAND QUANTITY (Q_new)</div><div class='kpi-change-val'>{custom_q:,.0f} {unit_label}</div><div class='kpi-subtext'>Baseline: <b style='color:#ffffff;'>{base_qty:,.0f}</b></div><div class='kpi-subtext'><b style='color:#34d399;'>Change: {pct_change_qty:+.1f}%</b></div></div>", unsafe_allow_html=True)
     with c_d3:
-        st.markdown(f"<div class='kpi-change-card'><b>3. WEEKLY REVENUE</b><br><div class='kpi-change-val'>{price_unit} {custom_rev:,.2f}</div>Baseline: {price_unit} {base_rev:,.2f}<br><b>Change: {pct_change_rev:+.1f}%</b></div>", unsafe_allow_html=True)
+        st.markdown(f"<div class='kpi-change-card'><div class='kpi-change-title'>3. WEEKLY REVENUE</div><div class='kpi-change-val'>{price_unit} {custom_rev:,.2f}</div><div class='kpi-subtext'>Baseline: <b style='color:#ffffff;'>{price_unit} {base_rev:,.2f}</b></div><div class='kpi-subtext'><b style='color:#7dd3fc;'>Change: {pct_change_rev:+.1f}%</b></div></div>", unsafe_allow_html=True)
     with c_d4:
-        st.markdown(f"<div class='kpi-change-card'><b>4. GROSS PROFIT</b><br><div class='kpi-change-val'>{price_unit} {custom_prof:,.2f}</div>Baseline: {price_unit} {base_profit:,.2f}<br><b>Change: {pct_change_profit:+.1f}%</b></div>", unsafe_allow_html=True)
+        st.markdown(f"<div class='kpi-change-card'><div class='kpi-change-title'>4. GROSS PROFIT</div><div class='kpi-change-val'>{price_unit} {custom_prof:,.2f}</div><div class='kpi-subtext'>Baseline: <b style='color:#ffffff;'>{price_unit} {base_profit:,.2f}</b></div><div class='kpi-subtext'><b style='color:#34d399;'>Change: {pct_change_profit:+.1f}%</b></div></div>", unsafe_allow_html=True)
 
     st.markdown("---")
     st.subheader("📈 3 Impact Graphs (Stacked Vertically)")

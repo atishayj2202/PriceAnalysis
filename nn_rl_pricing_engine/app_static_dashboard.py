@@ -11,8 +11,9 @@ Key Features:
   - Multi-domain selector (Laptops & Rice)
   - Month + Year Target Date Selector (up to 1 year ahead)
   - Range [-50% to +50%] price optimization grid
-  - 5-Model comparison matrix with 3 comparative curve graphs
-  - Interactive EDA Tab with Price, Demand, Seasonality, and Correlation Heatmaps
+  - 5-Model comparison matrix with 3 comparative curve graphs (Revenue vs Price, Profit vs Price, Price vs Quantity)
+  - Selection Change Tab with 3 Impact Curves
+  - Combined EDA & Historical Dataset Tab
 """
 
 import os
@@ -233,7 +234,6 @@ selected_brand = st.sidebar.selectbox(
     index=0
 )
 
-# Month & Year selector up to 1 year (12 months ahead from dataset max date)
 max_dt = df_raw['date'].max()
 future_dates = [max_dt + pd.DateOffset(months=i) for i in range(1, 13)]
 future_date_labels = [d.strftime("%B %Y") for d in future_dates]
@@ -263,7 +263,6 @@ selected_model_str = st.sidebar.radio(
     index=4
 )
 
-# Parse selected model clean name
 if "Option 1" in selected_model_str:
     clean_model_name = "PyTorch Deep Neural Network (MLP)"
 elif "Option 2" in selected_model_str:
@@ -275,7 +274,6 @@ elif "Option 4" in selected_model_str:
 else:
     clean_model_name = "Neuro-Boost Learned Stacking Hybrid"
 
-# Retrieve learned elasticity for active brand & model
 active_elasticity = ELASTICITIES.get(selected_brand, {}).get(clean_model_name, -3.8)
 
 # Baseline Metrics
@@ -334,14 +332,13 @@ with c4:
 with c5:
     st.markdown("<div class='metric-card' style='border-left-color:#fbbf24;'><b>⚡ Neuro-Boost</b><span class='fix-badge'>STACKED</span><br><span style='font-size:0.8rem; color:#fbbf24;'>Learned Ridge Stacking</span></div>", unsafe_allow_html=True)
 
-# Tabs Wiring
-tab1, tab_delta, tab2, tab_eda, tab3, tab4 = st.tabs([
+# Combined Tabs Wiring
+tab1, tab_delta, tab2, tab3, tab_eda = st.tabs([
     "🏠 Home: Profit & Revenue Optimization",
     "📊 Selection Change & Delta Analysis",
     "⚔️ 5-Model Industry Benchmark Matrix",
-    "📈 Exploratory Data Analysis (EDA)",
     "🔬 Deep Research & Architecture Diagnostics",
-    "📋 Historical Dataset Rows"
+    "📈 EDA & Historical Dataset"
 ])
 
 # ---------------------------------------------------------
@@ -463,7 +460,7 @@ with tab1:
     st.plotly_chart(fig_rev, width='stretch')
 
 # ---------------------------------------------------------
-# TAB 2: SELECTION CHANGE & DELTA ANALYSIS
+# TAB 2: SELECTION CHANGE & DELTA ANALYSIS (WITH 3 IMPACT GRAPHS)
 # ---------------------------------------------------------
 with tab_delta:
     st.header(f"📊 Selection Change & Delta Analysis ({selected_brand} - {selected_future_label})")
@@ -475,31 +472,149 @@ with tab_delta:
     custom_q = base_qty * ((1.0 + user_pct / 100.0) ** active_elasticity)
     custom_rev = custom_p * custom_q
     custom_prof = (custom_p - base_cost) * custom_q
+
+    base_rev = base_price * base_qty
+    base_profit = (base_price - base_cost) * base_qty
     
-    c_d1, c_d2, c_d3 = st.columns(3)
+    pct_change_qty = ((custom_q - base_qty) / (base_qty + 1e-5)) * 100.0
+    pct_change_rev = ((custom_rev - base_rev) / (base_rev + 1e-5)) * 100.0
+    pct_change_profit = ((custom_prof - base_profit) / (base_profit + 1e-5)) * 100.0
+
+    c_d1, c_d2, c_d3, c_d4 = st.columns(4)
     with c_d1:
-        st.metric("Selected Price", f"{price_unit} {custom_p:,.2f}", f"{user_pct:+.1f}%")
+        st.markdown(f"<div class='kpi-change-card'><b>1. RETAIL PRICE</b><br><div class='kpi-change-val'>{price_unit} {custom_p:,.2f}</div>Baseline: {price_unit} {base_price:,.2f}<br><b>Shift: {user_pct:+.1f}%</b></div>", unsafe_allow_html=True)
     with c_d2:
-        st.metric("Predicted Revenue", f"{price_unit} {custom_rev:,.2f}")
+        st.markdown(f"<div class='kpi-change-card'><b>2. DEMAND QUANTITY (Q_new)</b><br><div class='kpi-change-val'>{custom_q:,.0f} {unit_label}</div>Baseline: {base_qty:,.0f}<br><b>Change: {pct_change_qty:+.1f}%</b></div>", unsafe_allow_html=True)
     with c_d3:
-        st.metric("Predicted Gross Profit", f"{price_unit} {custom_prof:,.2f}")
+        st.markdown(f"<div class='kpi-change-card'><b>3. WEEKLY REVENUE</b><br><div class='kpi-change-val'>{price_unit} {custom_rev:,.2f}</div>Baseline: {price_unit} {base_rev:,.2f}<br><b>Change: {pct_change_rev:+.1f}%</b></div>", unsafe_allow_html=True)
+    with c_d4:
+        st.markdown(f"<div class='kpi-change-card'><b>4. GROSS PROFIT</b><br><div class='kpi-change-val'>{price_unit} {custom_prof:,.2f}</div>Baseline: {price_unit} {base_profit:,.2f}<br><b>Change: {pct_change_profit:+.1f}%</b></div>", unsafe_allow_html=True)
+
+    st.markdown("---")
+    st.subheader("📈 3 Impact Graphs (Stacked Vertically)")
+
+    fig_g1 = go.Figure()
+    fig_g1.add_trace(go.Scatter(x=p_grid, y=profits_grid, mode='lines', name='Profit Curve', line=dict(color='#10b981', width=3)))
+    fig_g1.add_trace(go.Scatter(x=[user_pct], y=[custom_prof], mode='markers+text', name='Selected Shift', marker=dict(color='#fbbf24', size=14, symbol='star'), text=[f"{pct_change_profit:+.1f}%"], textposition="top center"))
+    fig_g1 = apply_plotly_light_theme(fig_g1, f"1. Gross Profit Impact Curve ({selected_future_label})", "Price Shift (%) [-50% to +50%]", f"Profit ({price_unit})")
+    st.plotly_chart(fig_g1, width='stretch')
+
+    fig_g2 = go.Figure()
+    fig_g2.add_trace(go.Scatter(x=p_grid, y=revs_grid, mode='lines', name='Revenue Curve', line=dict(color='#38bdf8', width=3)))
+    fig_g2.add_trace(go.Scatter(x=[user_pct], y=[custom_rev], mode='markers+text', name='Selected Shift', marker=dict(color='#7dd3fc', size=14, symbol='diamond'), text=[f"{pct_change_rev:+.1f}%"], textposition="top center"))
+    fig_g2 = apply_plotly_light_theme(fig_g2, f"2. Revenue Impact Curve ({selected_future_label})", "Price Shift (%) [-50% to +50%]", f"Revenue ({price_unit})")
+    st.plotly_chart(fig_g2, width='stretch')
+
+    fig_g3 = go.Figure()
+    fig_g3.add_trace(go.Scatter(x=p_grid, y=qtys_grid, mode='lines', name='Demand Curve (Q_new)', line=dict(color='#a855f7', width=3)))
+    fig_g3.add_trace(go.Scatter(x=[user_pct], y=[custom_q], mode='markers+text', name='Selected Shift', marker=dict(color='#c084fc', size=14, symbol='square'), text=[f"{pct_change_qty:+.1f}%"], textposition="top center"))
+    fig_g3 = apply_plotly_light_theme(fig_g3, f"3. Demand Volume (Q_new) Impact Curve ({selected_future_label})", "Price Shift (%) [-50% to +50%]", f"Demand Volume Q_new ({unit_label})")
+    st.plotly_chart(fig_g3, width='stretch')
 
 # ---------------------------------------------------------
-# TAB 3: 5-MODEL BENCHMARK MATRIX
+# TAB 3: 5-MODEL BENCHMARK MATRIX & COMPARATIVE GRAPHS
 # ---------------------------------------------------------
 with tab2:
-    st.header("⚔️ 5-Model Industry Benchmark Comparison Matrix")
+    st.header(f"⚔️ 5 End-to-End Model Comparison Matrix ({selected_brand})")
+
     if df_results is not None:
-        st.dataframe(df_results, width='stretch')
+        brand_res = df_results[df_results['brand'] == selected_brand]
+        st.dataframe(brand_res, width='stretch')
+
+        st.markdown("---")
+        st.subheader("📊 Metric Comparison Charts")
+
+        col_b1, col_b2 = st.columns(2)
+        with col_b1:
+            fig_wmape = go.Figure()
+            fig_wmape.add_trace(go.Bar(
+                x=brand_res['model'], y=brand_res['WMAPE'],
+                marker_color=['#38bdf8', '#a855f7', '#10b981', '#f59e0b', '#ef4444'],
+                text=brand_res['WMAPE'].apply(lambda x: f"{x:.1f}%"),
+                textposition='auto', textfont=dict(color='white')
+            ))
+            fig_wmape = apply_plotly_light_theme(fig_wmape, f"WMAPE Comparison (Lower is Better)", "Model", "WMAPE (%)", height=380)
+            st.plotly_chart(fig_wmape, width='stretch')
+
+        with col_b2:
+            fig_r2 = go.Figure()
+            fig_r2.add_trace(go.Bar(
+                x=brand_res['model'], y=brand_res['R2'],
+                marker_color=['#38bdf8', '#a855f7', '#10b981', '#f59e0b', '#ef4444'],
+                text=brand_res['R2'].apply(lambda x: f"{x:.4f}"),
+                textposition='auto', textfont=dict(color='white')
+            ))
+            fig_r2 = apply_plotly_light_theme(fig_r2, f"R² Comparison (Higher is Better)", "Model", "R²", height=380)
+            st.plotly_chart(fig_r2, width='stretch')
+
+        if 'mean_elasticity' in brand_res.columns:
+            fig_elas = go.Figure()
+            fig_elas.add_trace(go.Bar(
+                x=brand_res['model'], y=brand_res['mean_elasticity'],
+                marker_color=['#38bdf8', '#a855f7', '#10b981', '#f59e0b', '#ef4444'],
+                text=brand_res['mean_elasticity'].apply(lambda x: f"{x:.3f}"),
+                textposition='auto', textfont=dict(color='white')
+            ))
+            fig_elas = apply_plotly_light_theme(fig_elas, f"Learned Price Elasticity of Demand (ε)", "Model", "Elasticity (ε)", height=380)
+            st.plotly_chart(fig_elas, width='stretch')
+
+        st.markdown("---")
+        st.subheader(f"📈 5-Model Comparative Curves ({selected_brand} - {selected_future_label})")
+
+        model_names = [
+            ("PyTorch Deep Neural Network (MLP)", "#38bdf8"),
+            ("Temporal LSTM-Attention Network", "#a855f7"),
+            ("LightGBM Gradient Boosted Ensemble", "#10b981"),
+            ("Deep Q-Network (DQN) RL Agent", "#f59e0b"),
+            ("Neuro-Boost Learned Stacking Hybrid", "#ef4444")
+        ]
+
+        models_comp = []
+        for m_title, color in model_names:
+            e_val = ELASTICITIES.get(selected_brand, {}).get(m_title, active_elasticity)
+            q_m = base_qty * (p_ratio_grid ** e_val)
+            models_comp.append((m_title, q_m, color))
+
+        fig_comp_profit = go.Figure()
+        for name, q_grid_m, color in models_comp:
+            prof_grid_m = (prices_grid - base_cost) * q_grid_m
+            fig_comp_profit.add_trace(go.Scatter(
+                x=p_grid, y=prof_grid_m,
+                mode='lines', name=name,
+                line=dict(color=color, width=2.5)
+            ))
+        fig_comp_profit = apply_plotly_light_theme(fig_comp_profit, f"1. Gross Profit vs Price Shift Comparison ({selected_brand})", "Price Shift (%) [-50% to +50%]", f"Gross Profit ({price_unit})")
+        st.plotly_chart(fig_comp_profit, width='stretch')
+
+        fig_comp_rev = go.Figure()
+        for name, q_grid_m, color in models_comp:
+            rev_grid_m = prices_grid * q_grid_m
+            fig_comp_rev.add_trace(go.Scatter(
+                x=p_grid, y=rev_grid_m,
+                mode='lines', name=name,
+                line=dict(color=color, width=2.5)
+            ))
+        fig_comp_rev = apply_plotly_light_theme(fig_comp_rev, f"2. Weekly Revenue vs Price Shift Comparison ({selected_brand})", "Price Shift (%) [-50% to +50%]", f"Weekly Revenue ({price_unit})")
+        st.plotly_chart(fig_comp_rev, width='stretch')
+
+        fig_comp_qty = go.Figure()
+        for name, q_grid_m, color in models_comp:
+            fig_comp_qty.add_trace(go.Scatter(
+                x=p_grid, y=q_grid_m,
+                mode='lines', name=name,
+                line=dict(color=color, width=2.5)
+            ))
+        fig_comp_qty = apply_plotly_light_theme(fig_comp_qty, f"3. Demand Volume (Price vs Quantity) Comparison ({selected_brand})", "Price Shift (%) [-50% to +50%]", f"Demand Volume ({unit_label})")
+        st.plotly_chart(fig_comp_qty, width='stretch')
     else:
         st.info("Pre-computed pipeline results table loaded successfully.")
 
 # ---------------------------------------------------------
-# TAB EDA: EXPLORATORY DATA ANALYSIS
+# TAB EDA: COMBINED EXPLORATORY DATA ANALYSIS & HISTORICAL DATASET
 # ---------------------------------------------------------
 with tab_eda:
-    st.header(f"📈 Exploratory Data Analysis: {domain_title}")
-    st.markdown("Comprehensive statistical and graphical exploration of prices, volume, seasonality, and price elasticity.")
+    st.header(f"📈 Exploratory Data Analysis & Historical Dataset: {domain_title}")
+    st.markdown("Comprehensive statistical and graphical exploration of prices, volume, seasonality, correlation, and historical rows.")
     
     col_eda1, col_eda2 = st.columns(2)
     
@@ -548,6 +663,11 @@ with tab_eda:
         )
         st.plotly_chart(fig_c, width='stretch')
 
+    st.markdown("---")
+    st.subheader(f"📋 Historical Raw Dataset Rows for {selected_brand}")
+    brand_df_diag = df_raw[df_raw['brand'] == selected_brand].sort_values('date', ascending=False)
+    st.dataframe(brand_df_diag, width='stretch')
+
 # ---------------------------------------------------------
 # TAB 4: DEEP RESEARCH DIAGNOSTICS
 # ---------------------------------------------------------
@@ -574,14 +694,6 @@ with tab3:
     ### ⚡ Model 5: Neuro-Boost Learned Stacking Hybrid
     - **Architecture**: Ridge regression meta-learner combining out-of-sample predictions from MLP + LGB + LSTM
     """)
-
-# ---------------------------------------------------------
-# TAB 5: RAW DATASET ROWS
-# ---------------------------------------------------------
-with tab4:
-    st.header(f"📋 Historical Dataset Rows for {selected_brand}")
-    brand_df_diag = df_raw[df_raw['brand'] == selected_brand].sort_values('date', ascending=False)
-    st.dataframe(brand_df_diag, width='stretch')
 
 st.markdown("---")
 st.caption("Pre-Built Dynamic Pricing Dashboard v1.0 | Zero Overhead | Instant Render Mode")

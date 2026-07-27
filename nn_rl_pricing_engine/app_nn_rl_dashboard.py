@@ -618,13 +618,12 @@ with c5:
     st.markdown("<div class='metric-card' style='border-left-color:#fbbf24;'><b>⚡ Neuro-Boost</b><span class='fix-badge'>STACKED</span><br><span style='font-size:0.8rem; color:#fbbf24;'>Learned Ridge Stacking</span></div>", unsafe_allow_html=True)
 
 # Tabs Wiring
-tab1, tab_delta, tab2, tab_eda, tab3, tab4 = st.tabs([
+tab1, tab_delta, tab2, tab3, tab_eda = st.tabs([
     "🏠 Home: Profit & Revenue Optimization",
     "📊 Selection Change & Delta Analysis",
     "⚔️ 5-Model Industry Benchmark Matrix",
-    "📈 Exploratory Data Analysis (EDA)",
     "🔬 Deep Research & Architecture Diagnostics",
-    "📋 Historical Dataset Rows"
+    "📈 EDA & Historical Dataset"
 ])
 
 # ---------------------------------------------------------
@@ -933,6 +932,11 @@ with tab_eda:
         )
         st.plotly_chart(fig_c, width='stretch')
 
+    st.markdown("---")
+    st.subheader(f"📋 Historical Raw Dataset Rows for {selected_brand}")
+    brand_df_diag = df_raw[df_raw['brand'] == selected_brand].sort_values('date', ascending=False)
+    st.dataframe(brand_df_diag, width='stretch')
+
 # ---------------------------------------------------------
 # TAB 4: DEEP RESEARCH DIAGNOSTICS
 # ---------------------------------------------------------
@@ -960,14 +964,6 @@ with tab3:
     ### ⚡ Model 5: Neuro-Boost Learned Stacking Hybrid
     - **Architecture**: Ridge regression meta-learner combining out-of-sample predictions from MLP + LGB + LSTM
     """)
-
-# ---------------------------------------------------------
-# TAB 5: RAW DATASET ROWS
-# ---------------------------------------------------------
-with tab4:
-    st.header(f"📋 Historical Dataset Rows for {selected_brand}")
-    brand_df_diag = df_raw[df_raw['brand'] == selected_brand].sort_values('date', ascending=False)
-    st.dataframe(brand_df_diag, width='stretch')
 
 st.markdown("---")
 st.caption("Multi-Domain Neural & RL Dynamic Pricing Engine v4.0 | Research-Backed | Elasticity Optimized")

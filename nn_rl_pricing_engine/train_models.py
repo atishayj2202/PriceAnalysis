@@ -190,13 +190,25 @@ def train_pytorch_mlp(X_tr, y_tr, X_val, y_val, epochs=250, lr=1e-3):
     for ep in range(epochs):
         epoch_loss = 0.0
         for bx, by in loader:
+            bx.requires_grad_(True)
             optimizer.zero_grad()
             out = model(bx)
             loss = criterion(out, by)
-            loss.backward()
+            
+            grad_outputs = torch.ones_like(out)
+            gradients = torch.autograd.grad(outputs=out, inputs=bx, grad_outputs=grad_outputs, 
+                                            create_graph=True, retain_graph=True)[0]
+            
+            # PINN Monotonicity Loss: penalize positive gradients for price (index 0)
+            price_gradients = gradients[:, 0]
+            monotonicity_loss = torch.mean(torch.nn.functional.relu(price_gradients))
+            
+            total_loss = loss + 10.0 * monotonicity_loss
+            
+            total_loss.backward()
             torch.nn.utils.clip_grad_norm_(model.parameters(), max_norm=1.0)
             optimizer.step()
-            epoch_loss += loss.item()
+            epoch_loss += total_loss.item()
 
         model.eval()
         with torch.no_grad():
@@ -263,13 +275,26 @@ def train_lstm_attention(X_seq_tr, y_seq_tr, X_seq_val, y_seq_val, input_dim, ep
     for ep in range(epochs):
         epoch_loss = 0.0
         for bx, by in loader:
+            bx.requires_grad_(True)
             optimizer.zero_grad()
             out = model(bx)
             loss = criterion(out, by)
-            loss.backward()
+            
+            grad_outputs = torch.ones_like(out)
+            gradients = torch.autograd.grad(outputs=out, inputs=bx, grad_outputs=grad_outputs, 
+                                            create_graph=True, retain_graph=True)[0]
+            
+            # For LSTM, bx shape is (batch, seq_len, features)
+            # Price is index 0, penalize positive gradient on the most recent step (seq_len - 1)
+            recent_price_gradients = gradients[:, -1, 0]
+            monotonicity_loss = torch.mean(torch.nn.functional.relu(recent_price_gradients))
+            
+            total_loss = loss + 10.0 * monotonicity_loss
+            
+            total_loss.backward()
             torch.nn.utils.clip_grad_norm_(model.parameters(), max_norm=1.0)
             optimizer.step()
-            epoch_loss += loss.item()
+            epoch_loss += total_loss.item()
 
         model.eval()
         with torch.no_grad():
@@ -434,6 +459,13 @@ def train_domain(domain_name, csv_filename):
         torch.save(lstm_model.state_dict(), os.path.join(BASE_DIR, "models", "lstm_attention.pt"))
 
     print(f"Training Model 3: LightGBM ({domain_name})...")
+    monotone_constraints = []
+    for f in FEATURE_COLS:
+        if f in ['unit_price', 'price_ratio_comp1', 'price_ratio_comp2', 'price_ratio_comp3', 'margin_ratio', 'cross_price_diff']:
+            monotone_constraints.append(-1)
+        else:
+            monotone_constraints.append(0)
+
     lgb_train_ds = lgb.Dataset(X_train, label=y_train.ravel())
     lgb_val_ds = lgb.Dataset(X_test, label=y_test.ravel(), reference=lgb_train_ds)
     lgb_params = {
@@ -441,6 +473,7 @@ def train_domain(domain_name, csv_filename):
         'num_leaves': 63, 'max_depth': 8, 'min_child_samples': 10,
         'subsample': 0.8, 'colsample_bytree': 0.8, 'reg_alpha': 0.1,
         'reg_lambda': 0.1, 'verbose': -1, 'seed': 42, 'n_jobs': -1,
+        'monotone_constraints': monotone_constraints
     }
     lgb_model = lgb.train(lgb_params, lgb_train_ds, num_boost_round=500, valid_sets=[lgb_val_ds],
                           callbacks=[lgb.early_stopping(stopping_rounds=30, verbose=False)])
@@ -555,7 +588,7 @@ def train_domain(domain_name, csv_filename):
     meta_X = np.column_stack([preds_mlp_test, preds_lgb_test, preds_lstm_test])
     meta_y = y_test.ravel()
 
-    meta_learner = Ridge(alpha=1.0)
+    meta_learner = Ridge(alpha=1.0, positive=True)
     meta_learner.fit(meta_X, meta_y)
 
     with open(os.path.join(models_dir, "meta_learner.pkl"), "wb") as f:

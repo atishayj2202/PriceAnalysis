@@ -431,7 +431,7 @@ active_elasticity = ELASTICITIES.get(selected_brand, {}).get(clean_model_name, -
 # END-TO-END INFERENCE FUNCTION
 # ---------------------------------------------------------
 
-def build_feature_vector(brand, target_month, target_year, price_val, base_row):
+def build_feature_vector(brand, target_month, target_year, price_val, base_row, base_cost):
     month_sin = np.sin(2 * np.pi * target_month / 12.0)
     month_cos = np.cos(2 * np.pi * target_month / 12.0)
     week_num = int(target_month * 4.33)
@@ -510,7 +510,7 @@ def build_feature_vector(brand, target_month, target_year, price_val, base_row):
     return np.array([vec])
 
 
-def build_batch_feature_vectors(brand, target_month, target_year, prices_grid, base_row):
+def build_batch_feature_vectors(brand, target_month, target_year, prices_grid, base_row, base_cost):
     month_sin = np.sin(2 * np.pi * target_month / 12.0)
     month_cos = np.cos(2 * np.pi * target_month / 12.0)
     week_num = int(target_month * 4.33)
@@ -599,6 +599,13 @@ def predict_mlp(raw_vec):
         pred_s = mlp_model(torch.tensor(vec_scaled, dtype=torch.float32)).item()
     return max(100.0, scaler_y.inverse_transform([[pred_s]])[0][0])
 
+def predict_mlp_batch(raw_vecs):
+    vecs_scaled = scaler_X.transform(raw_vecs)
+    with torch.no_grad():
+        preds_s = mlp_model(torch.tensor(vecs_scaled, dtype=torch.float32)).numpy()
+    preds = scaler_y.inverse_transform(preds_s).flatten()
+    return np.maximum(100.0, preds)
+
 
 def predict_lstm(brand, raw_vec):
     brand_eng = df_engineered[df_engineered['brand'] == brand].sort_values('date')
@@ -613,9 +620,30 @@ def predict_lstm(brand, raw_vec):
     else:
         return predict_mlp(raw_vec)
 
+def predict_lstm_batch(brand, raw_vecs):
+    brand_eng = df_engineered[df_engineered['brand'] == brand].sort_values('date')
+    if len(brand_eng) >= SEQ_LEN:
+        hist_features = brand_eng[FEATURE_COLS].values[-(SEQ_LEN - 1):]
+        hist_scaled = scaler_X.transform(hist_features)
+        curr_scaled = scaler_X.transform(raw_vecs)
+        N = curr_scaled.shape[0]
+        hist_repeated = np.tile(hist_scaled, (N, 1, 1))
+        curr_reshaped = np.expand_dims(curr_scaled, axis=1)
+        windows = np.concatenate([hist_repeated, curr_reshaped], axis=1)
+        with torch.no_grad():
+            preds_s = lstm_model(torch.tensor(windows, dtype=torch.float32)).numpy()
+        preds = scaler_y.inverse_transform(preds_s).flatten()
+        return np.maximum(100.0, preds)
+    else:
+        return predict_mlp_batch(raw_vecs)
+
 
 def predict_lgb(raw_vec):
     return max(100.0, lgb_model.predict(raw_vec)[0])
+
+def predict_lgb_batch(raw_vecs):
+    preds = lgb_model.predict(raw_vecs)
+    return np.maximum(100.0, preds)
 
 
 def predict_dqn(brand, raw_vec, base_price, cost):
@@ -627,8 +655,13 @@ def predict_dqn(brand, raw_vec, base_price, cost):
     price_delta = ACTION_GRID[best_action]
     rl_price = base_price * (1.0 + price_delta)
     rl_vec = build_feature_vector(brand, target_month_num, target_year_num, rl_price,
-                                   df_raw[df_raw['brand'] == brand].sort_values('date').iloc[-1])
+                                   df_raw[df_raw['brand'] == brand].sort_values('date').iloc[-1], cost)
     return predict_mlp(rl_vec)
+
+def predict_dqn_batch(brand, raw_vecs, base_prices, cost):
+    # For the demand curve of the DQN agent, we use the underlying MLP demand model 
+    # because DQN just acts as a pricing policy rather than an explicit demand function.
+    return predict_mlp_batch(raw_vecs)
 
 
 def predict_hybrid(brand, raw_vec):
@@ -638,9 +671,17 @@ def predict_hybrid(brand, raw_vec):
     meta_feats = np.array([[p_mlp, p_lgb, p_lstm]])
     return max(100.0, meta_learner.predict(meta_feats)[0])
 
+def predict_hybrid_batch(brand, raw_vecs):
+    p_mlp = predict_mlp_batch(raw_vecs)
+    p_lgb = predict_lgb_batch(raw_vecs)
+    p_lstm = predict_lstm_batch(brand, raw_vecs)
+    meta_feats = np.column_stack([p_mlp, p_lgb, p_lstm])
+    preds = meta_learner.predict(meta_feats)
+    return np.maximum(100.0, preds)
 
-def predict_end_to_end(brand, target_month, target_year, price_val, base_row):
-    raw_vec = build_feature_vector(brand, target_month, target_year, price_val, base_row)
+
+def predict_end_to_end(brand, target_month, target_year, price_val, base_row, base_cost):
+    raw_vec = build_feature_vector(brand, target_month, target_year, price_val, base_row, base_cost)
 
     if "Option 1" in selected_model_str:
         return predict_mlp(raw_vec)
@@ -649,9 +690,22 @@ def predict_end_to_end(brand, target_month, target_year, price_val, base_row):
     elif "Option 3" in selected_model_str:
         return predict_lgb(raw_vec)
     elif "Option 4" in selected_model_str:
-        return predict_dqn(brand, raw_vec, price_val, base_row['cost_per_unit'])
+        return predict_dqn(brand, raw_vec, price_val, base_cost)
     else:
         return predict_hybrid(brand, raw_vec)
+
+def predict_end_to_end_batch(brand, target_month, target_year, prices_grid, base_row, base_cost):
+    raw_vecs = build_batch_feature_vectors(brand, target_month, target_year, prices_grid, base_row, base_cost)
+    if "Option 1" in selected_model_str:
+        return predict_mlp_batch(raw_vecs)
+    elif "Option 2" in selected_model_str:
+        return predict_lstm_batch(brand, raw_vecs)
+    elif "Option 3" in selected_model_str:
+        return predict_lgb_batch(raw_vecs)
+    elif "Option 4" in selected_model_str:
+        return predict_dqn_batch(brand, raw_vecs, prices_grid, base_cost)
+    else:
+        return predict_hybrid_batch(brand, raw_vecs)
 
 
 # Baseline Metrics
@@ -667,7 +721,7 @@ base_cost = last_row['cost_per_unit'] * cogs_inflation_factor
 latest_date_str = last_row['date'].strftime('%b %d, %Y')
 
 # Model base demand forecast for the specific selected Month & Year
-base_qty = predict_end_to_end(selected_brand, target_month_num, target_year_num, base_price, last_row)
+base_qty = predict_end_to_end(selected_brand, target_month_num, target_year_num, base_price, last_row, base_cost)
 base_rev = base_price * base_qty
 base_profit = (base_price - base_cost) * base_qty
 
@@ -676,8 +730,8 @@ p_grid = np.linspace(-50, 50, 2000)
 prices_grid = base_price * (1.0 + p_grid / 100.0)
 p_ratio_grid = 1.0 + p_grid / 100.0
 
-# Structural Causal Demand Curve: Q(P) = base_qty * (P / P_base) ^ elasticity
-qtys_grid = base_qty * (p_ratio_grid ** active_elasticity)
+# Empirical Model-Based Demand Curve (2000 points)
+qtys_grid = predict_end_to_end_batch(selected_brand, target_month_num, target_year_num, prices_grid, last_row, base_cost)
 revs_grid = prices_grid * qtys_grid
 profits_grid = (prices_grid - base_cost) * qtys_grid
 
@@ -839,26 +893,37 @@ with tab_delta:
         key=f"slider_{selected_brand}_{tab_delta_date}"
     )
 
+    tab_delta_month_num = future_dates[future_date_labels.index(tab_delta_date)].month
+    tab_delta_year_num = future_dates[future_date_labels.index(tab_delta_date)].year
+    
+    delta_year_diff = tab_delta_year_num - last_row['date'].year
+    delta_cogs_inflation = (1.0 + 0.04) ** max(0, delta_year_diff)
+    delta_base_cost = last_row['cost_per_unit'] * delta_cogs_inflation
+
     cust_price_val = base_price * (1.0 + custom_price_change / 100.0)
-    cust_p_ratio = 1.0 + custom_price_change / 100.0
-    cust_qty_val = base_qty * (cust_p_ratio ** active_elasticity)
+    cust_qty_val = predict_end_to_end(selected_brand, tab_delta_month_num, tab_delta_year_num, cust_price_val, last_row, delta_base_cost)
+    
+    delta_base_qty = predict_end_to_end(selected_brand, tab_delta_month_num, tab_delta_year_num, base_price, last_row, delta_base_cost)
+    delta_base_rev = base_price * delta_base_qty
+    delta_base_profit = (base_price - delta_base_cost) * delta_base_qty
+
     cust_rev_val = cust_price_val * cust_qty_val
-    cust_profit_val = (cust_price_val - base_cost) * cust_qty_val
+    cust_profit_val = (cust_price_val - delta_base_cost) * cust_qty_val
 
     pct_change_price = custom_price_change
-    pct_change_qty = ((cust_qty_val - base_qty) / (base_qty + 1e-5)) * 100.0
-    pct_change_rev = ((cust_rev_val - base_rev) / (base_rev + 1e-5)) * 100.0
-    pct_change_profit = ((cust_profit_val - base_profit) / (base_profit + 1e-5)) * 100.0
+    pct_change_qty = ((cust_qty_val - delta_base_qty) / (delta_base_qty + 1e-5)) * 100.0
+    pct_change_rev = ((cust_rev_val - delta_base_rev) / (delta_base_rev + 1e-5)) * 100.0
+    pct_change_profit = ((cust_profit_val - delta_base_profit) / (delta_base_profit + 1e-5)) * 100.0
 
     col_d1, col_d2, col_d3, col_d4 = st.columns(4)
     with col_d1:
         st.markdown(f"<div class='kpi-change-card'><div class='kpi-change-title'>1. RETAIL PRICE</div><div class='kpi-change-val'>{price_unit} {cust_price_val:,.2f}</div><div class='kpi-subtext'>Baseline: <b style='color:#ffffff;'>{price_unit} {base_price:,.2f}</b></div><div class='kpi-subtext'><b style='color:#38bdf8;'>Shift: {pct_change_price:+.1f}%</b></div></div>", unsafe_allow_html=True)
     with col_d2:
-        st.markdown(f"<div class='kpi-change-card'><div class='kpi-change-title'>2. DEMAND QUANTITY (Q_new)</div><div class='kpi-change-val'>{cust_qty_val/1e3:.1f}k {unit_label}</div><div class='kpi-subtext'>Baseline: <b style='color:#ffffff;'>{base_qty/1e3:.1f}k</b></div><div class='kpi-subtext'><b style='color:#34d399;'>Change: {pct_change_qty:+.1f}%</b></div></div>", unsafe_allow_html=True)
+        st.markdown(f"<div class='kpi-change-card'><div class='kpi-change-title'>2. DEMAND QUANTITY (Q_new)</div><div class='kpi-change-val'>{cust_qty_val/1e3:.1f}k {unit_label}</div><div class='kpi-subtext'>Baseline: <b style='color:#ffffff;'>{delta_base_qty/1e3:.1f}k</b></div><div class='kpi-subtext'><b style='color:#34d399;'>Change: {pct_change_qty:+.1f}%</b></div></div>", unsafe_allow_html=True)
     with col_d3:
-        st.markdown(f"<div class='kpi-change-card'><div class='kpi-change-title'>3. WEEKLY REVENUE</div><div class='kpi-change-val'>₹{cust_rev_val/1e7:.2f} Cr</div><div class='kpi-subtext'>Baseline: <b style='color:#ffffff;'>₹{base_rev/1e7:.2f} Cr</b></div><div class='kpi-subtext'><b style='color:#7dd3fc;'>Change: {pct_change_rev:+.1f}%</b></div></div>", unsafe_allow_html=True)
+        st.markdown(f"<div class='kpi-change-card'><div class='kpi-change-title'>3. WEEKLY REVENUE</div><div class='kpi-change-val'>₹{cust_rev_val/1e7:.2f} Cr</div><div class='kpi-subtext'>Baseline: <b style='color:#ffffff;'>₹{delta_base_rev/1e7:.2f} Cr</b></div><div class='kpi-subtext'><b style='color:#7dd3fc;'>Change: {pct_change_rev:+.1f}%</b></div></div>", unsafe_allow_html=True)
     with col_d4:
-        st.markdown(f"<div class='kpi-change-card'><div class='kpi-change-title'>4. GROSS PROFIT</div><div class='kpi-change-val'>₹{cust_profit_val/1e7:.2f} Cr</div><div class='kpi-subtext'>Baseline: <b style='color:#ffffff;'>₹{base_profit/1e7:.2f} Cr</b></div><div class='kpi-subtext'><b style='color:#34d399;'>Change: {pct_change_profit:+.1f}%</b></div></div>", unsafe_allow_html=True)
+        st.markdown(f"<div class='kpi-change-card'><div class='kpi-change-title'>4. GROSS PROFIT</div><div class='kpi-change-val'>₹{cust_profit_val/1e7:.2f} Cr</div><div class='kpi-subtext'>Baseline: <b style='color:#ffffff;'>₹{delta_base_profit/1e7:.2f} Cr</b></div><div class='kpi-subtext'><b style='color:#34d399;'>Change: {pct_change_profit:+.1f}%</b></div></div>", unsafe_allow_html=True)
 
     st.markdown("---")
     st.subheader("📈 3 Impact Graphs (Stacked Vertically)")
@@ -939,19 +1004,18 @@ with tab2:
 
         models_comp = []
         for m_title, color in model_names:
+            raw_vecs_batch = build_batch_feature_vectors(selected_brand, target_month_num, target_year_num, prices_grid, last_row, base_cost)
             if "MLP" in m_title:
-                m_base_q = predict_mlp(build_feature_vector(selected_brand, target_month_num, target_year_num, base_price, last_row))
+                q_m = predict_mlp_batch(raw_vecs_batch)
             elif "LSTM" in m_title:
-                m_base_q = predict_lstm(selected_brand, build_feature_vector(selected_brand, target_month_num, target_year_num, base_price, last_row))
+                q_m = predict_lstm_batch(selected_brand, raw_vecs_batch)
             elif "LightGBM" in m_title:
-                m_base_q = predict_lgb(build_feature_vector(selected_brand, target_month_num, target_year_num, base_price, last_row))
+                q_m = predict_lgb_batch(raw_vecs_batch)
             elif "DQN" in m_title:
-                m_base_q = predict_dqn(selected_brand, build_feature_vector(selected_brand, target_month_num, target_year_num, base_price, last_row), base_price, base_cost)
+                q_m = predict_dqn_batch(selected_brand, raw_vecs_batch, prices_grid, base_cost)
             else:
-                m_base_q = predict_hybrid(selected_brand, build_feature_vector(selected_brand, target_month_num, target_year_num, base_price, last_row))
+                q_m = predict_hybrid_batch(selected_brand, raw_vecs_batch)
 
-            e_val = ELASTICITIES.get(selected_brand, {}).get(m_title, -1.45)
-            q_m = m_base_q * (p_ratio_grid ** e_val)
             models_comp.append((m_title, q_m, color))
 
         fig_comp_profit = go.Figure()

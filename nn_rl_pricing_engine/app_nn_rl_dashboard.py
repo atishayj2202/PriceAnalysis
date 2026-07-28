@@ -510,65 +510,157 @@ def build_feature_vector(brand, target_month, target_year, price_val, base_row):
     return np.array([vec])
 
 
-def predict_mlp(raw_vec):
-    vec_scaled = scaler_X.transform(raw_vec)
+def build_batch_feature_vectors(brand, target_month, target_year, prices_grid, base_row):
+    month_sin = np.sin(2 * np.pi * target_month / 12.0)
+    month_cos = np.cos(2 * np.pi * target_month / 12.0)
+    week_num = int(target_month * 4.33)
+    week_sin = np.sin(2 * np.pi * week_num / 52.0)
+    week_cos = np.cos(2 * np.pi * week_num / 52.0)
+
+    is_fest = 1 if target_month in [8, 9, 10, 11] else 0
+    is_pr = base_row.get('is_promo', 0)
+    cogs = base_row['cost_per_unit']
+
+    cp1 = base_row.get('comp_price_1', base_row['unit_price'] * 0.95)
+    cp2 = base_row.get('comp_price_2', base_row['unit_price'] * 0.90)
+    cp3 = base_row.get('comp_price_3', base_row['unit_price'] * 0.85)
+
+    brand_eng = df_engineered[df_engineered['brand'] == brand].sort_values('date')
+    if len(brand_eng) > 0:
+        last_eng = brand_eng.iloc[-1]
+        qty_lag_1 = last_eng.get('qty_lag_1', base_row['units_sold'])
+        qty_lag_4 = last_eng.get('qty_lag_4', base_row['units_sold'])
+        qty_lag_13 = last_eng.get('qty_lag_13', base_row['units_sold'])
+        qty_roll_mean_4 = last_eng.get('qty_roll_mean_4', base_row['units_sold'])
+        qty_roll_std_4 = last_eng.get('qty_roll_std_4', 0)
+        qty_roll_mean_13 = last_eng.get('qty_roll_mean_13', base_row['units_sold'])
+        price_velocity = last_eng.get('price_velocity', 0)
+        discount_depth = last_eng.get('discount_depth', 0)
+        price_lag_1 = last_eng.get('price_lag_1', base_row['unit_price'])
+    else:
+        qty_lag_1 = base_row['units_sold']
+        qty_lag_4 = base_row['units_sold']
+        qty_lag_13 = base_row['units_sold']
+        qty_roll_mean_4 = base_row['units_sold']
+        qty_roll_std_4 = 0
+        qty_roll_mean_13 = base_row['units_sold']
+        price_velocity = 0
+        discount_depth = 0
+        price_lag_1 = base_row['unit_price']
+
+    vec_rows = []
+    for price_val in prices_grid:
+        p_ratio1 = price_val / (cp1 + 1e-5)
+        p_ratio2 = price_val / (cp2 + 1e-5)
+        p_ratio3 = price_val / (cp3 + 1e-5)
+        m_ratio = (price_val - cogs) / (price_val + 1e-5)
+        cross_diff = price_val - (cp1 + cp2 + cp3) / 3.0
+
+        feat_dict = {
+            'unit_price': price_val,
+            'cost_per_unit': cogs,
+            'comp_price_1': cp1,
+            'comp_price_2': cp2,
+            'comp_price_3': cp3,
+            'is_promo': is_pr,
+            'is_festival': is_fest,
+            'month_sin': month_sin,
+            'month_cos': month_cos,
+            'week_sin': week_sin,
+            'week_cos': week_cos,
+            'price_ratio_comp1': p_ratio1,
+            'price_ratio_comp2': p_ratio2,
+            'price_ratio_comp3': p_ratio3,
+            'margin_ratio': m_ratio,
+            'cross_price_diff': cross_diff,
+            'price_velocity': price_velocity,
+            'discount_depth': discount_depth,
+            'qty_lag_1': qty_lag_1,
+            'qty_lag_4': qty_lag_4,
+            'qty_lag_13': qty_lag_13,
+            'qty_roll_mean_4': qty_roll_mean_4,
+            'qty_roll_std_4': qty_roll_std_4,
+            'qty_roll_mean_13': qty_roll_mean_13,
+            'price_lag_1': price_lag_1,
+        }
+
+        for b in BRANDS_LIST:
+            feat_dict[f'brand_{b}'] = 1.0 if brand == b else 0.0
+
+        vec = [feat_dict[col] for col in FEATURE_COLS if col in feat_dict]
+        vec_rows.append(vec)
+
+    return np.array(vec_rows)
+
+
+def predict_mlp_batch(raw_vecs):
+    vecs_scaled = scaler_X.transform(raw_vecs)
     with torch.no_grad():
-        pred_s = mlp_model(torch.tensor(vec_scaled, dtype=torch.float32)).item()
-    return max(100.0, scaler_y.inverse_transform([[pred_s]])[0][0])
+        preds_s = mlp_model(torch.tensor(vecs_scaled, dtype=torch.float32)).numpy()
+    preds_orig = scaler_y.inverse_transform(preds_s).flatten()
+    return np.maximum(100.0, preds_orig)
 
 
-def predict_lstm(brand, raw_vec):
+def predict_lgb_batch(raw_vecs):
+    preds = lgb_model.predict(raw_vecs)
+    return np.maximum(100.0, preds)
+
+
+def predict_lstm_batch(brand, raw_vecs):
     brand_eng = df_engineered[df_engineered['brand'] == brand].sort_values('date')
     if len(brand_eng) >= SEQ_LEN:
         hist_features = brand_eng[FEATURE_COLS].values[-(SEQ_LEN - 1):]
         hist_scaled = scaler_X.transform(hist_features)
-        curr_scaled = scaler_X.transform(raw_vec)
-        window = np.vstack([hist_scaled, curr_scaled])
+        curr_scaled = scaler_X.transform(raw_vecs)
+
+        windows = np.zeros((len(raw_vecs), SEQ_LEN, len(FEATURE_COLS)), dtype=np.float32)
+        windows[:, :-1, :] = hist_scaled
+        windows[:, -1, :] = curr_scaled
+
         with torch.no_grad():
-            pred_s = lstm_model(torch.tensor(window, dtype=torch.float32).unsqueeze(0)).item()
-        return max(100.0, scaler_y.inverse_transform([[pred_s]])[0][0])
+            preds_s = lstm_model(torch.tensor(windows, dtype=torch.float32)).numpy()
+        preds_orig = scaler_y.inverse_transform(preds_s).flatten()
+        return np.maximum(100.0, preds_orig)
     else:
-        return predict_mlp(raw_vec)
+        return predict_mlp_batch(raw_vecs)
 
 
-def predict_lgb(raw_vec):
-    return max(100.0, lgb_model.predict(raw_vec)[0])
-
-
-def predict_dqn(brand, raw_vec, base_price, cost):
-    vec_scaled = scaler_X.transform(raw_vec)
-    state = vec_scaled[0]
+def predict_dqn_batch(brand, raw_vecs, base_price, cogs):
+    vecs_scaled = scaler_X.transform(raw_vecs)
     with torch.no_grad():
-        q_vals = dqn_model(torch.tensor(state, dtype=torch.float32).unsqueeze(0))
-        best_action = q_vals.argmax(dim=1).item()
-    price_delta = ACTION_GRID[best_action]
-    rl_price = base_price * (1.0 + price_delta)
-    rl_vec = build_feature_vector(brand, target_month_num, target_year_num, rl_price,
-                                   df_raw[df_raw['brand'] == brand].sort_values('date').iloc[-1])
-    return predict_mlp(rl_vec)
+        q_vals = dqn_model(torch.tensor(vecs_scaled, dtype=torch.float32)).numpy()
+    best_actions = np.argmax(q_vals, axis=1)
+    price_deltas = ACTION_GRID[best_actions]
+    rl_prices = base_price * (1.0 + price_deltas)
+
+    rl_raw_vecs = build_batch_feature_vectors(brand, target_month_num, target_year_num, rl_prices, last_row)
+    return predict_mlp_batch(rl_raw_vecs)
 
 
-def predict_hybrid(brand, raw_vec):
-    p_mlp = predict_mlp(raw_vec)
-    p_lgb = predict_lgb(raw_vec)
-    p_lstm = predict_lstm(brand, raw_vec)
-    meta_feats = np.array([[p_mlp, p_lgb, p_lstm]])
-    return max(100.0, meta_learner.predict(meta_feats)[0])
+def predict_hybrid_batch(brand, raw_vecs):
+    p_mlp = predict_mlp_batch(raw_vecs)
+    p_lgb = predict_lgb_batch(raw_vecs)
+    p_lstm = predict_lstm_batch(brand, raw_vecs)
+
+    meta_feats = np.column_stack([p_mlp, p_lgb, p_lstm])
+    preds_hybrid = meta_learner.predict(meta_feats)
+    return np.maximum(100.0, preds_hybrid)
 
 
-def predict_end_to_end(brand, target_month, target_year, price_val, base_row):
-    raw_vec = build_feature_vector(brand, target_month, target_year, price_val, base_row)
+def predict_end_to_end_batch(brand, target_month, target_year, prices_grid, base_row):
+    raw_vecs = build_batch_feature_vectors(brand, target_month, target_year, prices_grid, base_row)
 
     if "Option 1" in selected_model_str:
-        return predict_mlp(raw_vec)
+        return predict_mlp_batch(raw_vecs)
     elif "Option 2" in selected_model_str:
-        return predict_lstm(brand, raw_vec)
+        return predict_lstm_batch(brand, raw_vecs)
     elif "Option 3" in selected_model_str:
-        return predict_lgb(raw_vec)
+        return predict_lgb_batch(raw_vecs)
     elif "Option 4" in selected_model_str:
-        return predict_dqn(brand, raw_vec, price_val, base_row['cost_per_unit'])
+        return predict_dqn_batch(brand, raw_vecs, base_row['unit_price'], base_row['cost_per_unit'])
     else:
-        return predict_hybrid(brand, raw_vec)
+        return predict_hybrid_batch(brand, raw_vecs)
+
 
 # Baseline Metrics
 brand_df = df_raw[df_raw['brand'] == selected_brand].sort_values('date').reset_index(drop=True)
@@ -577,23 +669,19 @@ base_price = last_row['unit_price']
 base_cost = last_row['cost_per_unit']
 latest_date_str = last_row['date'].strftime('%b %d, %Y')
 
-# Model baseline demand prediction at current base price
-base_qty = predict_end_to_end(selected_brand, target_month_num, target_year_num, base_price, last_row)
+# Direct 2000 Point Inference Grid across [-50% to +50%]
+p_grid = np.linspace(-50, 50, 2000)
+prices_grid = base_price * (1.0 + p_grid / 100.0)
+
+# Build feature vectors for all 2000 price points and run direct model inference
+raw_vecs_grid = build_batch_feature_vectors(selected_brand, target_month_num, target_year_num, prices_grid, last_row)
+qtys_grid = predict_end_to_end_batch(selected_brand, target_month_num, target_year_num, prices_grid, last_row)
+
+base_idx = np.argmin(np.abs(p_grid))
+base_qty = qtys_grid[base_idx]
 base_rev = base_price * base_qty
 base_profit = (base_price - base_cost) * base_qty
 
-# ---------------------------------------------------------
-# INDUSTRY-STANDARD MICROECONOMIC ELASTICITY GRID [-50% TO +50%]
-# ---------------------------------------------------------
-p_grid = np.linspace(-50, 50, 401)
-prices_grid = base_price * (1.0 + p_grid / 100.0)
-
-# Microeconomic Log-Log Demand Elasticity Curve: Q(P) = Q_base * (P / P_base) ^ elas
-def compute_elasticity_demand_grid(q_base, p_ratio_grid, elasticity_val):
-    return q_base * (p_ratio_grid ** elasticity_val)
-
-p_ratio_grid = 1.0 + p_grid / 100.0
-qtys_grid = compute_elasticity_demand_grid(base_qty, p_ratio_grid, active_elasticity)
 revs_grid = prices_grid * qtys_grid
 profits_grid = (prices_grid - base_cost) * qtys_grid
 
@@ -607,6 +695,7 @@ opt_prof_val = profits_grid[opt_prof_idx]
 
 # Revenue Peak
 opt_rev_idx = np.argmax(revs_grid)
+opt_rev_price_pct = p_grid[opt_rev_idx]
 opt_rev_price_pct = p_grid[opt_rev_idx]
 opt_rev_price_val = prices_grid[opt_rev_idx]
 opt_rev_qty_val = qtys_grid[opt_rev_idx]
@@ -854,40 +943,48 @@ with tab2:
 
         models_comp = []
         for m_title, color in model_names:
-            e_val = ELASTICITIES.get(selected_brand, {}).get(m_title, -1.45)
-            q_m = base_qty * (p_ratio_grid ** e_val)
+            if "MLP" in m_title:
+                q_m = predict_mlp_batch(raw_vecs_grid)
+            elif "LSTM" in m_title:
+                q_m = predict_lstm_batch(selected_brand, raw_vecs_grid)
+            elif "LightGBM" in m_title:
+                q_m = predict_lgb_batch(raw_vecs_grid)
+            elif "DQN" in m_title:
+                q_m = predict_dqn_batch(selected_brand, raw_vecs_grid, base_price, base_cost)
+            else:
+                q_m = predict_hybrid_batch(selected_brand, raw_vecs_grid)
             models_comp.append((m_title, q_m, color))
 
         fig_comp_profit = go.Figure()
         for name, q_grid_m, color in models_comp:
             prof_grid_m = (prices_grid - base_cost) * q_grid_m
             fig_comp_profit.add_trace(go.Scatter(
-                x=p_grid, y=prof_grid_m / 1e7,
+                x=p_grid, y=prof_grid_m,
                 mode='lines', name=name,
                 line=dict(color=color, width=2.5)
             ))
-        apply_plotly_light_theme(fig_comp_profit, f"1. Gross Profit vs Price Shift Comparison ({selected_brand} - {selected_future_label})", "Price Shift (%) [-50% to +50%]", "Gross Profit (₹ Crore)")
+        apply_plotly_light_theme(fig_comp_profit, f"1. Gross Profit vs Price Shift Comparison ({selected_brand} - {selected_future_label})", "Price Shift (%) [-50% to +50%]", f"Gross Profit ({price_unit})")
         st.plotly_chart(fig_comp_profit, width='stretch')
 
         fig_comp_rev = go.Figure()
         for name, q_grid_m, color in models_comp:
             rev_grid_m = prices_grid * q_grid_m
             fig_comp_rev.add_trace(go.Scatter(
-                x=p_grid, y=rev_grid_m / 1e7,
+                x=p_grid, y=rev_grid_m,
                 mode='lines', name=name,
                 line=dict(color=color, width=2.5)
             ))
-        apply_plotly_light_theme(fig_comp_rev, f"2. Weekly Revenue vs Price Shift Comparison ({selected_brand} - {selected_future_label})", "Price Shift (%) [-50% to +50%]", "Weekly Revenue (₹ Crore)")
+        apply_plotly_light_theme(fig_comp_rev, f"2. Weekly Revenue vs Price Shift Comparison ({selected_brand} - {selected_future_label})", "Price Shift (%) [-50% to +50%]", f"Weekly Revenue ({price_unit})")
         st.plotly_chart(fig_comp_rev, width='stretch')
 
         fig_comp_qty = go.Figure()
         for name, q_grid_m, color in models_comp:
             fig_comp_qty.add_trace(go.Scatter(
-                x=p_grid, y=q_grid_m / 1e3,
+                x=p_grid, y=q_grid_m,
                 mode='lines', name=name,
                 line=dict(color=color, width=2.5)
             ))
-        apply_plotly_light_theme(fig_comp_qty, f"3. Demand Volume (Q_new) vs Price Shift Comparison ({selected_brand} - {selected_future_label})", "Price Shift (%) [-50% to +50%]", f"Demand Volume Q_new (k {unit_label})")
+        apply_plotly_light_theme(fig_comp_qty, f"3. Demand Volume (Q_new) vs Price Shift Comparison ({selected_brand} - {selected_future_label})", "Price Shift (%) [-50% to +50%]", f"Demand Volume Q_new ({unit_label})")
         st.plotly_chart(fig_comp_qty, width='stretch')
     else:
         st.info("Run `python nn_rl_pricing_engine/train_models.py` to populate pipeline results.")

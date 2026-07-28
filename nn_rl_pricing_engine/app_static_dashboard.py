@@ -301,7 +301,7 @@ base_qty = last_row['units_sold']
 # ---------------------------------------------------------
 # INDUSTRY-STANDARD MICROECONOMIC ELASTICITY GRID [-50% TO +50%]
 # ---------------------------------------------------------
-p_grid = np.linspace(-50, 50, 401)
+p_grid = np.linspace(-50, 50, 2000)
 prices_grid = base_price * (1.0 + p_grid / 100.0)
 
 def compute_elasticity_demand_grid(q_base, p_ratio_grid, elasticity_val):

@@ -725,8 +725,8 @@ base_qty = predict_end_to_end(selected_brand, target_month_num, target_year_num,
 base_rev = base_price * base_qty
 base_profit = (base_price - base_cost) * base_qty
 
-# 2000-Point High Resolution Price Shift Grid [-50% to +50%]
-p_grid = np.linspace(-50, 50, 2000)
+# 2000-Point High Resolution Price Shift Grid [-15% to +15%]
+p_grid = np.linspace(-15, 15, 2000)
 prices_grid = base_price * (1.0 + p_grid / 100.0)
 p_ratio_grid = 1.0 + p_grid / 100.0
 
@@ -823,9 +823,11 @@ with tab1:
         """, unsafe_allow_html=True)
 
     fig_prof = go.Figure()
-    fig_prof.add_trace(go.Scatter(x=p_grid, y=profits_grid/1e7, mode='lines', name='End-to-End Profit Curve', line=dict(color='#10b981', width=3)))
-    fig_prof.add_trace(go.Scatter(x=[opt_prof_price_pct], y=[opt_prof_val/1e7], mode='markers+text', name=f'Profit Peak ({price_unit} {opt_prof_price_val:,.2f})', marker=dict(color='#fbbf24', size=14, symbol='star'), text=[f"Max Profit: ₹{opt_prof_val/1e7:.2f} Cr"], textposition="top center"))
-    apply_plotly_light_theme(fig_prof, f"End-to-End Gross Profit Curve ({selected_brand} - {selected_future_label})", "Price Shift (%) [-50% to +50%]", "Gross Profit (₹ Crore)")
+    profit_pct_shift = ((profits_grid - base_profit)/(base_profit + 1e-5)) * 100.0
+    opt_prof_val_pct = ((opt_prof_val - base_profit)/(base_profit + 1e-5)) * 100.0
+    fig_prof.add_trace(go.Scatter(x=p_grid, y=profit_pct_shift, mode='lines', name='End-to-End Profit Curve', line=dict(color='#10b981', width=3)))
+    fig_prof.add_trace(go.Scatter(x=[opt_prof_price_pct], y=[opt_prof_val_pct], mode='markers+text', name=f'Profit Peak ({price_unit} {opt_prof_price_val:,.2f})', marker=dict(color='#fbbf24', size=14, symbol='star'), text=[f"Max Profit Shift: {opt_prof_val_pct:+.2f}%"], textposition="top center"))
+    apply_plotly_light_theme(fig_prof, f"End-to-End Gross Profit Curve ({selected_brand} - {selected_future_label})", "Price Shift (%) [-15% to +15%]", "Gross Profit Shift (%)")
     st.plotly_chart(fig_prof, width='stretch')
 
     st.markdown("---")
@@ -869,13 +871,15 @@ with tab1:
         """, unsafe_allow_html=True)
 
     fig_rev = go.Figure()
-    fig_rev.add_trace(go.Scatter(x=p_grid, y=revs_grid/1e7, mode='lines', name='End-to-End Revenue Curve', line=dict(color='#38bdf8', width=3)))
-    fig_rev.add_trace(go.Scatter(x=[opt_rev_price_pct], y=[opt_rev_val/1e7], mode='markers+text', name=f'Revenue Peak ({price_unit} {opt_rev_price_val:,.2f})', marker=dict(color='#7dd3fc', size=14, symbol='diamond'), text=[f"Max Revenue: ₹{opt_rev_val/1e7:.2f} Cr"], textposition="top center"))
-    apply_plotly_light_theme(fig_rev, f"End-to-End Revenue Curve ({selected_brand} - {selected_future_label})", "Price Shift (%) [-50% to +50%]", "Weekly Revenue (₹ Crore)")
+    rev_pct_shift = ((revs_grid - base_rev)/(base_rev + 1e-5)) * 100.0
+    opt_rev_val_pct = ((opt_rev_val - base_rev)/(base_rev + 1e-5)) * 100.0
+    fig_rev.add_trace(go.Scatter(x=p_grid, y=rev_pct_shift, mode='lines', name='End-to-End Revenue Curve', line=dict(color='#38bdf8', width=3)))
+    fig_rev.add_trace(go.Scatter(x=[opt_rev_price_pct], y=[opt_rev_val_pct], mode='markers+text', name=f'Revenue Peak ({price_unit} {opt_rev_price_val:,.2f})', marker=dict(color='#7dd3fc', size=14, symbol='diamond'), text=[f"Max Rev Shift: {opt_rev_val_pct:+.2f}%"], textposition="top center"))
+    apply_plotly_light_theme(fig_rev, f"End-to-End Revenue Curve ({selected_brand} - {selected_future_label})", "Price Shift (%) [-15% to +15%]", "Weekly Revenue Shift (%)")
     st.plotly_chart(fig_rev, width='stretch')
 
 # ---------------------------------------------------------
-# TAB 2: SELECTION CHANGE & DELTA ANALYSIS (-50% TO +50%)
+# TAB 2: SELECTION CHANGE & DELTA ANALYSIS (-15% TO +15%)
 # ---------------------------------------------------------
 with tab_delta:
     st.header(f"📊 Delta Impact Analysis for Future Target: {selected_future_label}")
@@ -889,7 +893,7 @@ with tab_delta:
 
     custom_price_change = st.slider(
         f"💡 Adjust Price Shift for {selected_brand} in {tab_delta_date} (%)",
-        min_value=-50.0, max_value=+50.0, value=0.0, step=0.5,
+        min_value=-15.0, max_value=+15.0, value=0.0, step=0.5,
         key=f"slider_{selected_brand}_{tab_delta_date}"
     )
 
@@ -1026,7 +1030,7 @@ with tab2:
                 mode='lines', name=name,
                 line=dict(color=color, width=2.5)
             ))
-        apply_plotly_light_theme(fig_comp_profit, f"1. Gross Profit vs Price Shift Comparison ({selected_brand} - {selected_future_label})", "Price Shift (%) [-50% to +50%]", f"Gross Profit ({price_unit})")
+        apply_plotly_light_theme(fig_comp_profit, f"1. Gross Profit vs Price Shift Comparison ({selected_brand} - {selected_future_label})", "Price Shift (%) [-15% to +15%]", f"Gross Profit ({price_unit})")
         st.plotly_chart(fig_comp_profit, width='stretch')
 
         fig_comp_rev = go.Figure()
@@ -1037,7 +1041,7 @@ with tab2:
                 mode='lines', name=name,
                 line=dict(color=color, width=2.5)
             ))
-        apply_plotly_light_theme(fig_comp_rev, f"2. Weekly Revenue vs Price Shift Comparison ({selected_brand} - {selected_future_label})", "Price Shift (%) [-50% to +50%]", f"Weekly Revenue ({price_unit})")
+        apply_plotly_light_theme(fig_comp_rev, f"2. Weekly Revenue vs Price Shift Comparison ({selected_brand} - {selected_future_label})", "Price Shift (%) [-15% to +15%]", f"Weekly Revenue ({price_unit})")
         st.plotly_chart(fig_comp_rev, width='stretch')
 
         fig_comp_qty = go.Figure()
@@ -1047,7 +1051,7 @@ with tab2:
                 mode='lines', name=name,
                 line=dict(color=color, width=2.5)
             ))
-        apply_plotly_light_theme(fig_comp_qty, f"3. Demand Volume (Q_new) vs Price Shift Comparison ({selected_brand} - {selected_future_label})", "Price Shift (%) [-50% to +50%]", f"Demand Volume Q_new ({unit_label})")
+        apply_plotly_light_theme(fig_comp_qty, f"3. Demand Volume (Q_new) vs Price Shift Comparison ({selected_brand} - {selected_future_label})", "Price Shift (%) [-15% to +15%]", f"Demand Volume Q_new ({unit_label})")
         st.plotly_chart(fig_comp_qty, width='stretch')
     else:
         st.info("Run `python nn_rl_pricing_engine/train_models.py` to populate pipeline results.")

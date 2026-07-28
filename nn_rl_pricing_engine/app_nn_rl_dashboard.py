@@ -431,7 +431,7 @@ active_elasticity = ELASTICITIES.get(selected_brand, {}).get(clean_model_name, -
 # END-TO-END INFERENCE FUNCTION
 # ---------------------------------------------------------
 
-def build_feature_vector(brand, target_month, target_year, price_val, base_row, base_cost):
+def build_feature_vector(brand, target_month, target_year, price_val, base_row, base_cost, comp_market_shift_pct=0.0):
     month_sin = np.sin(2 * np.pi * target_month / 12.0)
     month_cos = np.cos(2 * np.pi * target_month / 12.0)
     week_num = int(target_month * 4.33)
@@ -442,9 +442,10 @@ def build_feature_vector(brand, target_month, target_year, price_val, base_row, 
     is_pr = base_row.get('is_promo', 0)
     cogs = base_row['cost_per_unit']
 
-    cp1 = base_row.get('comp_price_1', price_val * 0.95)
-    cp2 = base_row.get('comp_price_2', price_val * 0.90)
-    cp3 = base_row.get('comp_price_3', price_val * 0.85)
+    comp_shift_factor = 1.0 + (comp_market_shift_pct / 100.0)
+    cp1 = base_row.get('comp_price_1', price_val * 0.95) * comp_shift_factor
+    cp2 = base_row.get('comp_price_2', price_val * 0.90) * comp_shift_factor
+    cp3 = base_row.get('comp_price_3', price_val * 0.85) * comp_shift_factor
 
     p_ratio1 = price_val / (cp1 + 1e-5)
     p_ratio2 = price_val / (cp2 + 1e-5)
@@ -510,7 +511,7 @@ def build_feature_vector(brand, target_month, target_year, price_val, base_row, 
     return np.array([vec])
 
 
-def build_batch_feature_vectors(brand, target_month, target_year, prices_grid, base_row, base_cost):
+def build_batch_feature_vectors(brand, target_month, target_year, prices_grid, base_row, base_cost, comp_market_shift_pct=0.0):
     month_sin = np.sin(2 * np.pi * target_month / 12.0)
     month_cos = np.cos(2 * np.pi * target_month / 12.0)
     week_num = int(target_month * 4.33)
@@ -521,9 +522,10 @@ def build_batch_feature_vectors(brand, target_month, target_year, prices_grid, b
     is_pr = base_row.get('is_promo', 0)
     cogs = base_row['cost_per_unit']
 
-    cp1 = base_row.get('comp_price_1', base_row['unit_price'] * 0.95)
-    cp2 = base_row.get('comp_price_2', base_row['unit_price'] * 0.90)
-    cp3 = base_row.get('comp_price_3', base_row['unit_price'] * 0.85)
+    comp_shift_factor = 1.0 + (comp_market_shift_pct / 100.0)
+    cp1 = base_row.get('comp_price_1', base_row['unit_price'] * 0.95) * comp_shift_factor
+    cp2 = base_row.get('comp_price_2', base_row['unit_price'] * 0.90) * comp_shift_factor
+    cp3 = base_row.get('comp_price_3', base_row['unit_price'] * 0.85) * comp_shift_factor
 
     brand_eng = df_engineered[df_engineered['brand'] == brand].sort_values('date')
     if len(brand_eng) > 0:
@@ -680,8 +682,8 @@ def predict_hybrid_batch(brand, raw_vecs):
     return np.maximum(100.0, preds)
 
 
-def predict_end_to_end(brand, target_month, target_year, price_val, base_row, base_cost):
-    raw_vec = build_feature_vector(brand, target_month, target_year, price_val, base_row, base_cost)
+def predict_end_to_end(brand, target_month, target_year, price_val, base_row, base_cost, comp_market_shift_pct=0.0):
+    raw_vec = build_feature_vector(brand, target_month, target_year, price_val, base_row, base_cost, comp_market_shift_pct)
 
     if "Option 1" in selected_model_str:
         return predict_mlp(raw_vec)
@@ -694,8 +696,8 @@ def predict_end_to_end(brand, target_month, target_year, price_val, base_row, ba
     else:
         return predict_hybrid(brand, raw_vec)
 
-def predict_end_to_end_batch(brand, target_month, target_year, prices_grid, base_row, base_cost):
-    raw_vecs = build_batch_feature_vectors(brand, target_month, target_year, prices_grid, base_row, base_cost)
+def predict_end_to_end_batch(brand, target_month, target_year, prices_grid, base_row, base_cost, comp_market_shift_pct=0.0):
+    raw_vecs = build_batch_feature_vectors(brand, target_month, target_year, prices_grid, base_row, base_cost, comp_market_shift_pct)
     if "Option 1" in selected_model_str:
         return predict_mlp_batch(raw_vecs)
     elif "Option 2" in selected_model_str:
@@ -890,9 +892,17 @@ with tab_delta:
         index=selected_idx,
         key="delta_tab_date_selector"
     )
+    
+    st.markdown("### ⚔️ Competitor War-Gaming")
+    comp_market_shift_pct = st.slider(
+        f"Shift Average Competitor Market Price (%)",
+        min_value=-30.0, max_value=+30.0, value=0.0, step=1.0,
+        key=f"slider_comp_market_{selected_brand}"
+    )
 
+    st.markdown("### 🎯 Your Price Strategy")
     custom_price_change = st.slider(
-        f"💡 Adjust Price Shift for {selected_brand} in {tab_delta_date} (%)",
+        f"💡 Adjust Your Price Shift for {selected_brand} in {tab_delta_date} (%)",
         min_value=-15.0, max_value=+15.0, value=0.0, step=0.5,
         key=f"slider_{selected_brand}_{tab_delta_date}"
     )
@@ -905,14 +915,25 @@ with tab_delta:
     delta_base_cost = last_row['cost_per_unit'] * delta_cogs_inflation
 
     cust_price_val = base_price * (1.0 + custom_price_change / 100.0)
-    cust_qty_val = predict_end_to_end(selected_brand, tab_delta_month_num, tab_delta_year_num, cust_price_val, last_row, delta_base_cost)
+    cust_qty_val = predict_end_to_end(selected_brand, tab_delta_month_num, tab_delta_year_num, cust_price_val, last_row, delta_base_cost, comp_market_shift_pct)
     
-    delta_base_qty = predict_end_to_end(selected_brand, tab_delta_month_num, tab_delta_year_num, base_price, last_row, delta_base_cost)
+    delta_base_qty = predict_end_to_end(selected_brand, tab_delta_month_num, tab_delta_year_num, base_price, last_row, delta_base_cost, comp_market_shift_pct)
     delta_base_rev = base_price * delta_base_qty
     delta_base_profit = (base_price - delta_base_cost) * delta_base_qty
 
     cust_rev_val = cust_price_val * cust_qty_val
     cust_profit_val = (cust_price_val - delta_base_cost) * cust_qty_val
+    
+    # Calculate War-Gamed Curves for graphs
+    wg_qtys_grid = predict_end_to_end_batch(selected_brand, tab_delta_month_num, tab_delta_year_num, prices_grid, last_row, delta_base_cost, comp_market_shift_pct)
+    wg_revs_grid = prices_grid * wg_qtys_grid
+    wg_profits_grid = (prices_grid - delta_base_cost) * wg_qtys_grid
+
+    new_opt_prof_idx = np.argmax(wg_profits_grid)
+    new_opt_prof_shift = p_grid[new_opt_prof_idx]
+    
+    new_opt_rev_idx = np.argmax(wg_revs_grid)
+    new_opt_rev_shift = p_grid[new_opt_rev_idx]
 
     pct_change_price = custom_price_change
     pct_change_qty = ((cust_qty_val - delta_base_qty) / (delta_base_qty + 1e-5)) * 100.0
@@ -933,21 +954,31 @@ with tab_delta:
     st.subheader("📈 3 Impact Graphs (Stacked Vertically)")
 
     fig_g1 = go.Figure()
-    fig_g1.add_trace(go.Scatter(x=p_grid, y=profits_grid/1e7, mode='lines', name='Profit Curve', line=dict(color='#10b981', width=3)))
+    if comp_market_shift_pct != 0.0:
+        fig_g1.add_trace(go.Scatter(x=p_grid, y=profits_grid/1e7, mode='lines', name='Baseline Market Curve', line=dict(color='#94a3b8', width=2, dash='dash')))
+    fig_g1.add_trace(go.Scatter(x=p_grid, y=wg_profits_grid/1e7, mode='lines', name='War-Gamed Curve', line=dict(color='#10b981', width=3)))
     fig_g1.add_trace(go.Scatter(x=[custom_price_change], y=[cust_profit_val/1e7], mode='markers+text', name='Selected Shift', marker=dict(color='#fbbf24', size=14, symbol='star'), text=[f"{pct_change_profit:+.1f}%"], textposition="top center"))
-    apply_plotly_light_theme(fig_g1, f"1. Gross Profit Impact Curve ({selected_future_label})", "Price Shift (%) [-50% to +50%]", "Profit (₹ Cr)")
+    if comp_market_shift_pct != 0.0:
+        fig_g1.add_trace(go.Scatter(x=[new_opt_prof_shift], y=[wg_profits_grid[new_opt_prof_idx]/1e7], mode='markers+text', name='New Optimal', marker=dict(color='#34d399', size=12, symbol='circle'), text=["New Peak"], textposition="bottom center"))
+    apply_plotly_light_theme(fig_g1, f"1. Gross Profit Impact Curve ({selected_future_label})", "Price Shift (%) [-15% to +15%]", "Profit (₹ Cr)")
     st.plotly_chart(fig_g1, width='stretch')
 
     fig_g2 = go.Figure()
-    fig_g2.add_trace(go.Scatter(x=p_grid, y=revs_grid/1e7, mode='lines', name='Revenue Curve', line=dict(color='#38bdf8', width=3)))
+    if comp_market_shift_pct != 0.0:
+        fig_g2.add_trace(go.Scatter(x=p_grid, y=revs_grid/1e7, mode='lines', name='Baseline Market Curve', line=dict(color='#94a3b8', width=2, dash='dash')))
+    fig_g2.add_trace(go.Scatter(x=p_grid, y=wg_revs_grid/1e7, mode='lines', name='War-Gamed Curve', line=dict(color='#38bdf8', width=3)))
     fig_g2.add_trace(go.Scatter(x=[custom_price_change], y=[cust_rev_val/1e7], mode='markers+text', name='Selected Shift', marker=dict(color='#7dd3fc', size=14, symbol='diamond'), text=[f"{pct_change_rev:+.1f}%"], textposition="top center"))
-    apply_plotly_light_theme(fig_g2, f"2. Revenue Impact Curve ({selected_future_label})", "Price Shift (%) [-50% to +50%]", "Revenue (₹ Cr)")
+    if comp_market_shift_pct != 0.0:
+        fig_g2.add_trace(go.Scatter(x=[new_opt_rev_shift], y=[wg_revs_grid[new_opt_rev_idx]/1e7], mode='markers+text', name='New Optimal', marker=dict(color='#7dd3fc', size=12, symbol='circle'), text=["New Peak"], textposition="bottom center"))
+    apply_plotly_light_theme(fig_g2, f"2. Revenue Impact Curve ({selected_future_label})", "Price Shift (%) [-15% to +15%]", "Revenue (₹ Cr)")
     st.plotly_chart(fig_g2, width='stretch')
 
     fig_g3 = go.Figure()
-    fig_g3.add_trace(go.Scatter(x=p_grid, y=qtys_grid/1e3, mode='lines', name='Demand Curve (Q_new)', line=dict(color='#a855f7', width=3)))
+    if comp_market_shift_pct != 0.0:
+        fig_g3.add_trace(go.Scatter(x=p_grid, y=qtys_grid/1e3, mode='lines', name='Baseline Market Curve', line=dict(color='#94a3b8', width=2, dash='dash')))
+    fig_g3.add_trace(go.Scatter(x=p_grid, y=wg_qtys_grid/1e3, mode='lines', name='War-Gamed Curve (Q_new)', line=dict(color='#a855f7', width=3)))
     fig_g3.add_trace(go.Scatter(x=[custom_price_change], y=[cust_qty_val/1e3], mode='markers+text', name='Selected Shift', marker=dict(color='#c084fc', size=14, symbol='square'), text=[f"{pct_change_qty:+.1f}%"], textposition="top center"))
-    apply_plotly_light_theme(fig_g3, f"3. Demand Volume (Q_new) Impact Curve ({selected_future_label})", "Price Shift (%) [-50% to +50%]", f"Demand Volume Q_new (k {unit_label})")
+    apply_plotly_light_theme(fig_g3, f"3. Demand Volume (Q_new) Impact Curve ({selected_future_label})", "Price Shift (%) [-15% to +15%]", f"Demand Volume Q_new (k {unit_label})")
     st.plotly_chart(fig_g3, width='stretch')
 
 # ---------------------------------------------------------

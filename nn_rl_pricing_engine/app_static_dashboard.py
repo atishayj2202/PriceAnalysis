@@ -294,7 +294,12 @@ active_elasticity = ELASTICITIES.get(selected_brand, {}).get(clean_model_name, -
 brand_df = df_raw[df_raw['brand'] == selected_brand].sort_values('date').reset_index(drop=True)
 last_row = brand_df.iloc[-1]
 base_price = last_row['unit_price']
-base_cost = last_row['cost_per_unit']
+
+# Inflate COGS for future target years (4% annual inflation)
+year_diff = target_year_num - last_row['date'].year
+cogs_inflation_factor = (1.0 + 0.04) ** max(0, year_diff)
+base_cost = last_row['cost_per_unit'] * cogs_inflation_factor
+
 latest_date_str = last_row['date'].strftime('%b %d, %Y')
 base_qty = last_row['units_sold']
 

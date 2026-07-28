@@ -1,16 +1,16 @@
 brand,model,architecture,seasonality,decay,WMAPE,R2,RMSE,MAE,MASE,mean_elasticity,Rank_Score,split
-Daawat,PyTorch Deep Neural Network (MLP),End-to-End Deep Neural / RL,Learned End-to-End,Feature Encoded,6.71,0.8079,289839.52,196752.59,0.5011,-2.8943,80.861,test_only
-Daawat,Temporal LSTM-Attention Network,End-to-End Deep Neural / RL,Learned End-to-End,Feature Encoded,13.65,0.264,567376.3,400450.15,1.0199,-2.497,51.094,test_only
-Daawat,LightGBM Gradient Boosted Ensemble,End-to-End Deep Neural / RL,Learned End-to-End,Feature Encoded,9.93,0.6573,387149.87,291283.47,0.7419,-3.178,69.916,test_only
-Daawat,Deep Q-Network (DQN) RL Agent,End-to-End Deep Neural / RL,Learned End-to-End,Feature Encoded,14.56,0.3783,521471.28,426887.03,1.0873,-2.2133,54.071,test_only
-Daawat,Neuro-Boost Learned Stacking Hybrid,End-to-End Deep Neural / RL,Learned End-to-End,Feature Encoded,6.51,0.8173,282700.15,191040.29,0.4866,-2.8375,81.53,test_only
-Fortune,PyTorch Deep Neural Network (MLP),End-to-End Deep Neural / RL,Learned End-to-End,Feature Encoded,6.79,0.8598,108376.57,85967.87,0.4176,-3.312,84.044,test_only
-Fortune,Temporal LSTM-Attention Network,End-to-End Deep Neural / RL,Learned End-to-End,Feature Encoded,15.28,0.0886,276274.98,193471.54,0.9399,-2.8574,46.218,test_only
-Fortune,LightGBM Gradient Boosted Ensemble,End-to-End Deep Neural / RL,Learned End-to-End,Feature Encoded,9.16,0.7844,134374.43,115962.48,0.5634,-3.6367,77.684,test_only
-Fortune,Deep Q-Network (DQN) RL Agent,End-to-End Deep Neural / RL,Learned End-to-End,Feature Encoded,10.09,0.6967,159376.53,127673.26,0.6203,-2.5327,73.453,test_only
-Fortune,Neuro-Boost Learned Stacking Hybrid,End-to-End Deep Neural / RL,Learned End-to-End,Feature Encoded,6.84,0.8587,108776.08,86540.3,0.4204,-3.2471,83.935,test_only
-India_Gate,PyTorch Deep Neural Network (MLP),End-to-End Deep Neural / RL,Learned End-to-End,Feature Encoded,4.99,0.9245,120799.76,83859.34,0.3904,-2.1947,87.432,test_only
-India_Gate,Temporal LSTM-Attention Network,End-to-End Deep Neural / RL,Learned End-to-End,Feature Encoded,10.98,0.5351,299723.76,184460.58,0.8586,-1.8935,63.392,test_only
-India_Gate,LightGBM Gradient Boosted Ensemble,End-to-End Deep Neural / RL,Learned End-to-End,Feature Encoded,7.2,0.8396,176065.97,120991.02,0.5632,-2.4099,80.323,test_only
-India_Gate,Deep Q-Network (DQN) RL Agent,End-to-End Deep Neural / RL,Learned End-to-End,Feature Encoded,10.63,0.6573,257342.67,178636.22,0.8315,-1.6783,67.773,test_only
-India_Gate,Neuro-Boost Learned Stacking Hybrid,End-to-End Deep Neural / RL,Learned End-to-End,Feature Encoded,5.2,0.9174,126319.43,87418.7,0.4069,-2.1517,86.783,test_only
+Daawat,PyTorch Deep Neural Network (MLP),End-to-End Deep Neural / RL,Learned End-to-End,Feature Encoded,5.84,0.8716,237012.55,171399.57,0.4365,-2.8943,84.494,test_only
+Daawat,Temporal LSTM-Attention Network,End-to-End Deep Neural / RL,Learned End-to-End,Feature Encoded,14.69,0.2571,570051.08,430805.22,1.0972,-2.497,50.368,test_only
+Daawat,LightGBM Gradient Boosted Ensemble,End-to-End Deep Neural / RL,Learned End-to-End,Feature Encoded,10.45,0.6905,367957.86,306478.26,0.7806,-3.178,69.877,test_only
+Daawat,Deep Q-Network (DQN) RL Agent,End-to-End Deep Neural / RL,Learned End-to-End,Feature Encoded,35.92,-1.8084,1108324.25,1053480.55,2.6832,-2.2133,32.039,test_only
+Daawat,Neuro-Boost Learned Stacking Hybrid,End-to-End Deep Neural / RL,Learned End-to-End,Feature Encoded,5.48,0.879,230010.98,160607.08,0.4091,-2.8375,85.452,test_only
+Fortune,PyTorch Deep Neural Network (MLP),End-to-End Deep Neural / RL,Learned End-to-End,Feature Encoded,5.51,0.9019,90619.55,69785.46,0.339,-3.312,87.521,test_only
+Fortune,Temporal LSTM-Attention Network,End-to-End Deep Neural / RL,Learned End-to-End,Feature Encoded,15.4,0.1232,270984.63,194905.85,0.9469,-2.8574,47.059,test_only
+Fortune,LightGBM Gradient Boosted Ensemble,End-to-End Deep Neural / RL,Learned End-to-End,Feature Encoded,9.27,0.6774,164380.7,117368.16,0.5702,-3.6367,74.281,test_only
+Fortune,Deep Q-Network (DQN) RL Agent,End-to-End Deep Neural / RL,Learned End-to-End,Feature Encoded,38.38,-2.081,507970.18,485782.84,2.36,-2.5327,30.811,test_only
+Fortune,Neuro-Boost Learned Stacking Hybrid,End-to-End Deep Neural / RL,Learned End-to-End,Feature Encoded,5.69,0.8978,92537.37,72043.59,0.35,-3.2471,87.087,test_only
+India_Gate,PyTorch Deep Neural Network (MLP),End-to-End Deep Neural / RL,Learned End-to-End,Feature Encoded,5.74,0.9224,122480.26,96491.23,0.4491,-2.1947,85.817,test_only
+India_Gate,Temporal LSTM-Attention Network,End-to-End Deep Neural / RL,Learned End-to-End,Feature Encoded,11.75,0.5387,298562.83,197425.08,0.919,-1.8935,61.907,test_only
+India_Gate,LightGBM Gradient Boosted Ensemble,End-to-End Deep Neural / RL,Learned End-to-End,Feature Encoded,9.5,0.7746,208721.63,159589.82,0.7429,-2.4099,73.631,test_only
+India_Gate,Deep Q-Network (DQN) RL Agent,End-to-End Deep Neural / RL,Learned End-to-End,Feature Encoded,29.79,-0.5258,543006.48,500542.3,2.3299,-1.6783,35.106,test_only
+India_Gate,Neuro-Boost Learned Stacking Hybrid,End-to-End Deep Neural / RL,Learned End-to-End,Feature Encoded,5.53,0.9283,117738.53,92944.2,0.4326,-2.1517,86.429,test_only

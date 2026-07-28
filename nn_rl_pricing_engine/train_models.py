@@ -409,8 +409,72 @@ def train_domain(domain_name, csv_filename):
     df_train = df_engineered[train_mask].copy().reset_index(drop=True)
     df_test = df_engineered[test_mask].copy().reset_index(drop=True)
 
-    X_train = df_train[FEATURE_COLS].values
-    y_train = df_train[TARGET_COL].values.reshape(-1, 1)
+    X_train_list = []
+    y_train_list = []
+    
+    for brand in df_train['brand'].unique():
+        b_df = df_train[df_train['brand'] == brand].copy()
+        X_b = b_df[FEATURE_COLS].values
+        y_b = b_df[TARGET_COL].values.reshape(-1, 1)
+        
+        # Calculate Causal Elasticity for Augmentation
+        elasticity = compute_dml_elasticity(X_b, y_b)
+        # Enforce steep elasticity to ensure Profit maximizes within realistic bounds
+        if elasticity > -1.5:
+            elasticity = -1.5
+            
+        X_train_list.append(X_b)
+        y_train_list.append(y_b)
+        
+        idx_p = FEATURE_COLS.index('unit_price')
+        idx_cp1 = FEATURE_COLS.index('comp_price_1')
+        idx_cp2 = FEATURE_COLS.index('comp_price_2')
+        idx_cogs = FEATURE_COLS.index('cost_per_unit')
+        
+        idx_pr1 = FEATURE_COLS.index('price_ratio_comp1')
+        idx_pr2 = FEATURE_COLS.index('price_ratio_comp2')
+        idx_marg = FEATURE_COLS.index('margin_ratio')
+        idx_cross = FEATURE_COLS.index('cross_price_diff')
+        
+        # Causal Data Augmentation: Synthetic Price Shocks
+        # Shock Up (+10%)
+        X_b_up = X_b.copy()
+        X_b_up[:, idx_p] = X_b_up[:, idx_p] * 1.10
+        X_b_up[:, idx_pr1] = X_b_up[:, idx_p] / (X_b_up[:, idx_cp1] + 1e-5)
+        X_b_up[:, idx_pr2] = X_b_up[:, idx_p] / (X_b_up[:, idx_cp2] + 1e-5)
+        X_b_up[:, idx_marg] = (X_b_up[:, idx_p] - X_b_up[:, idx_cogs]) / (X_b_up[:, idx_p] + 1e-5)
+        
+        if 'comp_price_3' in FEATURE_COLS:
+            idx_cp3 = FEATURE_COLS.index('comp_price_3')
+            idx_pr3 = FEATURE_COLS.index('price_ratio_comp3')
+            X_b_up[:, idx_pr3] = X_b_up[:, idx_p] / (X_b_up[:, idx_cp3] + 1e-5)
+            X_b_up[:, idx_cross] = X_b_up[:, idx_p] - (X_b_up[:, idx_cp1] + X_b_up[:, idx_cp2] + X_b_up[:, idx_cp3]) / 3.0
+        else:
+            X_b_up[:, idx_cross] = X_b_up[:, idx_p] - (X_b_up[:, idx_cp1] + X_b_up[:, idx_cp2]) / 2.0
+            
+        y_b_up = y_b * (1.10 ** elasticity)
+        X_train_list.append(X_b_up)
+        y_train_list.append(y_b_up)
+        
+        # Shock Down (-10%)
+        X_b_down = X_b.copy()
+        X_b_down[:, idx_p] = X_b_down[:, idx_p] * 0.90
+        X_b_down[:, idx_pr1] = X_b_down[:, idx_p] / (X_b_down[:, idx_cp1] + 1e-5)
+        X_b_down[:, idx_pr2] = X_b_down[:, idx_p] / (X_b_down[:, idx_cp2] + 1e-5)
+        X_b_down[:, idx_marg] = (X_b_down[:, idx_p] - X_b_down[:, idx_cogs]) / (X_b_down[:, idx_p] + 1e-5)
+        
+        if 'comp_price_3' in FEATURE_COLS:
+            X_b_down[:, idx_pr3] = X_b_down[:, idx_p] / (X_b_down[:, idx_cp3] + 1e-5)
+            X_b_down[:, idx_cross] = X_b_down[:, idx_p] - (X_b_down[:, idx_cp1] + X_b_down[:, idx_cp2] + X_b_down[:, idx_cp3]) / 3.0
+        else:
+            X_b_down[:, idx_cross] = X_b_down[:, idx_p] - (X_b_down[:, idx_cp1] + X_b_down[:, idx_cp2]) / 2.0
+            
+        y_b_down = y_b * (0.90 ** elasticity)
+        X_train_list.append(X_b_down)
+        y_train_list.append(y_b_down)
+
+    X_train = np.vstack(X_train_list)
+    y_train = np.vstack(y_train_list)
     X_test = df_test[FEATURE_COLS].values
     y_test = df_test[TARGET_COL].values.reshape(-1, 1)
 

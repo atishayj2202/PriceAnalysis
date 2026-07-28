@@ -1,21 +1,21 @@
 brand,model,architecture,seasonality,decay,WMAPE,R2,RMSE,MAE,MASE,mean_elasticity,Rank_Score,split
-Asus,PyTorch Deep Neural Network (MLP),End-to-End Deep Neural / RL,Learned End-to-End,Feature Encoded,6.06,0.9174,1977.31,1552.7,0.3391,-4.9226,87.708,test_only
-Asus,Temporal LSTM-Attention Network,End-to-End Deep Neural / RL,Learned End-to-End,Feature Encoded,18.43,0.2255,6055.02,4719.1,1.0307,-4.2469,47.552,test_only
-Asus,LightGBM Gradient Boosted Ensemble,End-to-End Deep Neural / RL,Learned End-to-End,Feature Encoded,6.88,0.8813,2370.52,1763.17,0.3851,-5.4052,85.295,test_only
-Asus,Deep Q-Network (DQN) RL Agent,End-to-End Deep Neural / RL,Learned End-to-End,Feature Encoded,25.73,-0.1717,7447.63,6588.78,1.4391,-3.7643,37.137,test_only
-Asus,Neuro-Boost Learned Stacking Hybrid,End-to-End Deep Neural / RL,Learned End-to-End,Feature Encoded,7.19,0.8947,2232.35,1840.4,0.402,-4.8261,85.209,test_only
-Dell,PyTorch Deep Neural Network (MLP),End-to-End Deep Neural / RL,Learned End-to-End,Feature Encoded,7.86,0.8061,5624.02,4097.67,0.57,-3.8503,78.853,test_only
-Dell,Temporal LSTM-Attention Network,End-to-End Deep Neural / RL,Learned End-to-End,Feature Encoded,15.23,0.4031,9868.88,7937.03,1.104,-3.3219,54.475,test_only
-Dell,LightGBM Gradient Boosted Ensemble,End-to-End Deep Neural / RL,Learned End-to-End,Feature Encoded,7.14,0.8456,5019.25,3720.6,0.5175,-4.2278,81.447,test_only
-Dell,Deep Q-Network (DQN) RL Agent,End-to-End Deep Neural / RL,Learned End-to-End,Feature Encoded,28.42,-0.5399,15850.61,14807.13,2.0596,-2.9444,35.79,test_only
-Dell,Neuro-Boost Learned Stacking Hybrid,End-to-End Deep Neural / RL,Learned End-to-End,Feature Encoded,5.69,0.8972,4094.93,2964.61,0.4124,-3.7748,85.825,test_only
-HP,PyTorch Deep Neural Network (MLP),End-to-End Deep Neural / RL,Learned End-to-End,Feature Encoded,4.25,0.9569,5503.05,4389.52,0.2476,-4.3811,91.628,test_only
-HP,Temporal LSTM-Attention Network,End-to-End Deep Neural / RL,Learned End-to-End,Feature Encoded,16.39,0.3257,21756.71,16911.08,0.9538,-3.7797,52.503,test_only
-HP,LightGBM Gradient Boosted Ensemble,End-to-End Deep Neural / RL,Learned End-to-End,Feature Encoded,5.16,0.919,7543.19,5324.19,0.3003,-4.8106,88.983,test_only
-HP,Deep Q-Network (DQN) RL Agent,End-to-End Deep Neural / RL,Learned End-to-End,Feature Encoded,25.3,-0.1908,28913.25,26109.33,1.4725,-3.3502,37.349,test_only
-HP,Neuro-Boost Learned Stacking Hybrid,End-to-End Deep Neural / RL,Learned End-to-End,Feature Encoded,4.16,0.9546,5647.23,4290.27,0.242,-4.2951,91.719,test_only
-Lenovo,PyTorch Deep Neural Network (MLP),End-to-End Deep Neural / RL,Learned End-to-End,Feature Encoded,7.48,0.8881,5481.98,4429.8,0.4246,-4.5969,84.411,test_only
-Lenovo,Temporal LSTM-Attention Network,End-to-End Deep Neural / RL,Learned End-to-End,Feature Encoded,16.75,0.3881,12816.8,9918.19,0.9506,-3.966,54.259,test_only
-Lenovo,LightGBM Gradient Boosted Ensemble,End-to-End Deep Neural / RL,Learned End-to-End,Feature Encoded,7.32,0.842,6512.06,4333.31,0.4153,-5.0476,83.297,test_only
-Lenovo,Deep Q-Network (DQN) RL Agent,End-to-End Deep Neural / RL,Learned End-to-End,Feature Encoded,23.41,0.1079,15475.42,13863.02,1.3287,-3.5153,41.535,test_only
-Lenovo,Neuro-Boost Learned Stacking Hybrid,End-to-End Deep Neural / RL,Learned End-to-End,Feature Encoded,5.46,0.9284,4385.22,3234.04,0.31,-4.5068,88.922,test_only
+Asus,PyTorch Deep Neural Network (MLP),End-to-End Deep Neural / RL,Learned End-to-End,Feature Encoded,10.27,0.7629,3349.9,2629.34,0.5743,-4.9226,76.269,test_only
+Asus,Temporal LSTM-Attention Network,End-to-End Deep Neural / RL,Learned End-to-End,Feature Encoded,17.85,0.1621,6298.02,4570.59,0.9983,-4.2469,45.974,test_only
+Asus,LightGBM Gradient Boosted Ensemble,End-to-End Deep Neural / RL,Learned End-to-End,Feature Encoded,8.12,0.8336,2806.47,2080.44,0.4544,-5.4052,81.859,test_only
+Asus,Deep Q-Network (DQN) RL Agent,End-to-End Deep Neural / RL,Learned End-to-End,Feature Encoded,12.46,0.6996,3770.72,3190.7,0.6969,-3.7643,70.822,test_only
+Asus,Neuro-Boost Learned Stacking Hybrid,End-to-End Deep Neural / RL,Learned End-to-End,Feature Encoded,8.6,0.8271,2861.22,2203.48,0.4813,-4.8261,80.885,test_only
+Dell,PyTorch Deep Neural Network (MLP),End-to-End Deep Neural / RL,Learned End-to-End,Feature Encoded,6.47,0.8677,4646.34,3370.1,0.4688,-3.8503,83.421,test_only
+Dell,Temporal LSTM-Attention Network,End-to-End Deep Neural / RL,Learned End-to-End,Feature Encoded,14.77,0.2895,10766.88,7695.54,1.0704,-3.3219,51.299,test_only
+Dell,LightGBM Gradient Boosted Ensemble,End-to-End Deep Neural / RL,Learned End-to-End,Feature Encoded,7.9,0.7888,5870.4,4115.9,0.5725,-4.2278,78.264,test_only
+Dell,Deep Q-Network (DQN) RL Agent,End-to-End Deep Neural / RL,Learned End-to-End,Feature Encoded,10.76,0.7147,6822.98,5605.51,0.7797,-2.9444,70.467,test_only
+Dell,Neuro-Boost Learned Stacking Hybrid,End-to-End Deep Neural / RL,Learned End-to-End,Feature Encoded,5.97,0.8867,4298.64,3110.8,0.4327,-3.7748,84.963,test_only
+HP,PyTorch Deep Neural Network (MLP),End-to-End Deep Neural / RL,Learned End-to-End,Feature Encoded,5.16,0.9378,6608.83,5325.38,0.3003,-4.3811,89.546,test_only
+HP,Temporal LSTM-Attention Network,End-to-End Deep Neural / RL,Learned End-to-End,Feature Encoded,14.67,0.4332,19947.66,15139.99,0.8539,-3.7797,58.583,test_only
+HP,LightGBM Gradient Boosted Ensemble,End-to-End Deep Neural / RL,Learned End-to-End,Feature Encoded,5.86,0.9148,7732.18,6051.38,0.3413,-4.8106,87.687,test_only
+HP,Deep Q-Network (DQN) RL Agent,End-to-End Deep Neural / RL,Learned End-to-End,Feature Encoded,6.85,0.8867,8918.26,7067.46,0.3986,-3.3502,85.205,test_only
+HP,Neuro-Boost Learned Stacking Hybrid,End-to-End Deep Neural / RL,Learned End-to-End,Feature Encoded,4.52,0.9509,5873.59,4662.5,0.263,-4.2951,91.007,test_only
+Lenovo,PyTorch Deep Neural Network (MLP),End-to-End Deep Neural / RL,Learned End-to-End,Feature Encoded,5.86,0.9324,4259.17,3472.48,0.3328,-4.5969,88.385,test_only
+Lenovo,Temporal LSTM-Attention Network,End-to-End Deep Neural / RL,Learned End-to-End,Feature Encoded,16.64,0.3558,13151.24,9857.25,0.9447,-3.966,53.457,test_only
+Lenovo,LightGBM Gradient Boosted Ensemble,End-to-End Deep Neural / RL,Learned End-to-End,Feature Encoded,13.13,0.6504,9688.41,7777.6,0.7454,-5.0476,68.037,test_only
+Lenovo,Deep Q-Network (DQN) RL Agent,End-to-End Deep Neural / RL,Learned End-to-End,Feature Encoded,7.96,0.8572,6190.66,4713.75,0.4518,-3.5153,82.703,test_only
+Lenovo,Neuro-Boost Learned Stacking Hybrid,End-to-End Deep Neural / RL,Learned End-to-End,Feature Encoded,5.78,0.9246,4499.41,3423.48,0.3281,-4.5068,88.285,test_only
